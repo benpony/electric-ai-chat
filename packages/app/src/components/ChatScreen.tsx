@@ -4,16 +4,13 @@ import {
   Box,
   Flex,
   Text,
-  Heading,
   TextField,
   IconButton,
-  Card,
-  Avatar,
   ScrollArea,
   Button
 } from '@radix-ui/themes';
-import { Send, Menu } from 'lucide-react';
-import { Message, Chat, generateChatId, formatDate } from '../lib/utils';
+import { Menu } from 'lucide-react';
+import { Message, Chat, generateChatId } from '../lib/utils';
 import { toggleSidebar } from './Sidebar';
 
 export default function ChatScreen() {
@@ -25,6 +22,16 @@ export default function ChatScreen() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const username = localStorage.getItem('username') || 'User';
+
+  // Define CSS variables for theming that will adapt to dark mode
+  const themeVariables = {
+    '--color-background-message': 'var(--gray-3)',
+    '--shadow-message': '0 1px 1px rgba(0, 0, 0, 0.04)',
+    '@media (prefers-color-scheme: dark)': {
+      '--color-background-message': 'var(--gray-5)',
+      '--shadow-message': '0 1px 1px rgba(0, 0, 0, 0.2)',
+    }
+  };
 
   useEffect(() => {
     // Load chat from localStorage
@@ -130,7 +137,7 @@ export default function ChatScreen() {
   }
 
   return (
-    <Flex direction="column" style={{ height: '100%', width: '100%' }}>
+    <Flex direction="column" style={{ height: '100%', width: '100%', ...themeVariables }}>
       {/* Header with title and sidebar toggle */}
       <Flex 
         align="center" 
@@ -138,7 +145,8 @@ export default function ChatScreen() {
         style={{
           height: '56px',
           borderBottom: '1px solid var(--gray-5)',
-          padding: '0 16px'
+          padding: '0 16px',
+          flexShrink: 0
         }}
       >
         <Flex align="center" gap="2">
@@ -164,43 +172,68 @@ export default function ChatScreen() {
             {chat.messages.map((msg) => (
               <Flex 
                 key={msg.id} 
-                justify={msg.isAI ? "start" : "end"}
+                justify={
+                  msg.isAI ? "center" : 
+                  msg.sender === username ? "end" : "start"
+                }
               >
-                <Box
-                  style={{ 
-                    maxWidth: '85%',
-                    backgroundColor: msg.isAI ? 'var(--message-ai-bg)' : 'var(--message-user-bg)',
-                    padding: '8px 12px'
-                  }}
-                >
-                  <Flex align="center" gap="2">
-                    <Text size="1" weight="medium">
-                      {msg.sender}:
-                    </Text>
-                    <Text size="2" style={{ whiteSpace: 'pre-wrap' }}>
-                      {msg.content}
-                    </Text>
+                {msg.isAI ? (
+                  <Box
+                    style={{ 
+                      maxWidth: '800px',
+                      width: '100%'
+                    }}
+                  >
+                    <Flex justify="start">
+                      <Text size="2" style={{ 
+                        whiteSpace: 'pre-wrap',
+                        color: 'var(--gray-12)'
+                      }}>
+                        {msg.content}
+                      </Text>
+                    </Flex>
+                  </Box>
+                ) : (
+                  <Flex direction="column" style={{ maxWidth: '60%', marginBottom: '10px', alignItems: msg.sender === username ? 'flex-end' : 'flex-start' }}>
+                    {msg.sender !== username && (
+                      <Text size="1" style={{ 
+                        color: 'var(--gray-11)',
+                        marginLeft: '4px',
+                        marginBottom: '3px'
+                      }}>
+                        {msg.sender}
+                      </Text>
+                    )}
+                    <Box
+                      style={{ 
+                        backgroundColor: msg.sender === username 
+                          ? 'var(--accent-9)' 
+                          : 'var(--color-background-message)',
+                        color: msg.sender === username 
+                          ? 'white' 
+                          : 'var(--gray-12)',
+                        padding: '8px 12px',
+                        borderRadius: '18px',
+                        position: 'relative',
+                        maxWidth: 'fit-content',
+                        boxShadow: 'var(--shadow-message)'
+                      }}
+                    >
+                      <Text size="2" style={{ whiteSpace: 'pre-wrap' }}>
+                        {msg.content}
+                      </Text>
+                    </Box>
                   </Flex>
-                </Box>
+                )}
               </Flex>
             ))}
             
             {isLoading && (
-              <Flex justify="start">
-                <Box style={{ 
-                  backgroundColor: 'var(--message-ai-bg)',
-                  padding: '8px 12px'
-                }}>
-                  <Flex align="center" gap="2">
-                    <Text size="1" weight="medium">
-                      AI Assistant:
-                    </Text>
-                    <Box className="typing-indicator">
-                      <Box className="typing-dot" />
-                      <Box className="typing-dot" />
-                      <Box className="typing-dot" />
-                    </Box>
-                  </Flex>
+              <Flex justify="center">
+                <Box className="typing-indicator">
+                  <Box className="typing-dot" />
+                  <Box className="typing-dot" />
+                  <Box className="typing-dot" />
                 </Box>
               </Flex>
             )}

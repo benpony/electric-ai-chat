@@ -15,7 +15,6 @@ import {
   Moon,
   Sun,
   MessageSquarePlus,
-  MessageSquare,
   Monitor,
 } from "lucide-react";
 import { Chat } from "../lib/utils";
@@ -134,8 +133,8 @@ export default function Sidebar() {
           </Text>
           {!isMobile && (
             <Tooltip content="New Chat">
-              <IconButton variant="ghost" size="1" onClick={handleNewChat}>
-                <MessageSquarePlus size={16} />
+              <IconButton variant="ghost" size="2" onClick={handleNewChat}>
+                <MessageSquarePlus size={22} />
               </IconButton>
             </Tooltip>
           )}
@@ -178,8 +177,8 @@ export default function Sidebar() {
 
         {/* Chats */}
         <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-          <Box p="2">
-            <Text size="1" color="gray" mb="1" style={{ paddingLeft: "8px" }}>
+          <Box p="4">
+            <Text size="1" color="gray" mb="1" style={{ fontWeight: "medium" }}>
               RECENT CHATS
             </Text>
             <Flex direction="column" gap="1" style={{ paddingTop: "4px" }}>
@@ -196,16 +195,13 @@ export default function Sidebar() {
                     
                     style={{
                       justifyContent: "flex-start",
-                      height: "28px",
-                      padding: "0 8px",
-                      margin: "0 4px",
+                      height: "22px",
+                      backgroundColor: isActive ? "var(--gray-5)" : undefined,
+                      marginTop: "0",
+                      marginBottom: "0",
                     }}
                     onClick={() => handleChatClick(chat.id)}
                   >
-                    <MessageSquare
-                      size={14}
-                      style={{ marginRight: "4px", flexShrink: 0 }}
-                    />
                     <Text
                       size="1"
                       style={{
