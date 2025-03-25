@@ -192,7 +192,7 @@ export default function Sidebar() {
                       height: "22px",
                       backgroundColor: isActive ? "var(--gray-5)" : undefined,
                       marginTop: "0",
-                      marginBottom: "0",
+                      marginBottom: "-2px",
                     }}
                     onClick={() => handleChatClick(chat.id)}
                   >
@@ -202,7 +202,7 @@ export default function Sidebar() {
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
-                        fontWeight: isActive ? "bold" : "normal",
+                        // fontWeight: isActive ? "bold" : "normal",
                       }}
                     >
                       {chat.name}

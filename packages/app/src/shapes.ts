@@ -1,5 +1,5 @@
 import { Row } from "@electric-sql/client";
-import { useShape } from "@electric-sql/react";
+import { useShape, preloadShape } from "@electric-sql/react";
 
 const ELECTRIC_API_URL = import.meta.env.VITE_ELECTRIC_API_URL || "http://localhost:3000";
 
@@ -35,6 +35,15 @@ export function chatsShapeConfig(): ShapeOptions<Chat> {
 export function useChatsShape() {
   return useShape(chatsShapeConfig());
 };
+
+export async function preloadChats() {
+  await preloadShape({
+    url: `${ELECTRIC_API_URL}/v1/shape`,
+    params: {
+      table: "chats",
+    },
+  });
+}
 
 export function useChat(chatId: string) {
   const { data: chats } = useChatsShape();

@@ -12,6 +12,7 @@ import {
 import { Menu } from "lucide-react";
 import { toggleSidebar } from "./Sidebar";
 import { useChat, useMessagesShape } from "../shapes";
+import { addMessage } from "../api";
 
 export default function ChatScreen() {
   const { chatId } = useParams({ from: "/chat/$chatId" });
@@ -19,6 +20,7 @@ export default function ChatScreen() {
   const { data: messages } = useMessagesShape(chatId);
   const [message, setMessage] = useState("");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const username = localStorage.getItem("username") || "User";
 
@@ -47,8 +49,25 @@ export default function ChatScreen() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat?.messages]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    // TODO: Implement submit
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!message.trim()) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Send message to API
+      await addMessage(chatId, message.trim(), username);
+      
+      // Clear input
+      setMessage("");
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      // Could add error handling/display here
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!chat) {
@@ -197,9 +216,10 @@ export default function ChatScreen() {
                 placeholder="Type a message..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
+                disabled={isLoading}
               />
             </Box>
-            <Button type="submit" size="3" disabled={!message.trim()}>
+            <Button type="submit" size="3" disabled={!message.trim() || isLoading}>
               Send
             </Button>
           </Flex>

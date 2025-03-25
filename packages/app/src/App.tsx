@@ -13,10 +13,12 @@ import WelcomeScreen from './components/WelcomeScreen';
 import NewChatScreen from './components/NewChatScreen';
 import ChatScreen from './components/ChatScreen';
 import Sidebar from './components/Sidebar';
+import { preloadChats } from './shapes';
 
 // Define the root route
 const rootRoute = createRootRoute({
   component: () => {
+    const [loading, setLoading] = useState(true);
     const [username, setUsername] = useState<string | null>(
       localStorage.getItem('username')
     );
@@ -37,6 +39,10 @@ const rootRoute = createRootRoute({
       
       // Add storage event listener to detect changes from other tabs
       window.addEventListener('storage', checkAuth);
+
+      preloadChats().then(() => {
+        setLoading(false);
+      });
       
       return () => {
         clearInterval(interval);
@@ -46,6 +52,10 @@ const rootRoute = createRootRoute({
 
     // If username exists, user is logged in - show sidebar immediately
     const isLoggedIn = !!username;
+
+    if (loading) {
+      return null;
+    }
 
     return (
       <ThemeProvider defaultTheme="light">
