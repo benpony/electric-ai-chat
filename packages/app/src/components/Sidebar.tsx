@@ -17,8 +17,8 @@ import {
   MessageSquarePlus,
   Monitor,
 } from "lucide-react";
-import { Chat } from "../lib/utils";
 import { useTheme } from "./theme-provider";
+import { useChatsShape } from "../shapes";
 
 // Create a global variable to track sidebar state
 let isSidebarOpen = false;
@@ -32,7 +32,7 @@ export function toggleSidebar() {
 }
 
 export default function Sidebar() {
-  const [chats, setChats] = useState<Chat[]>([]);
+  const { data: chats } = useChatsShape();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpenState] = useState(false);
   const navigate = useNavigate();
@@ -58,12 +58,6 @@ export default function Sidebar() {
     isSidebarOpen = sidebarOpen;
     setSidebarOpen = setSidebarOpenState;
   }, [sidebarOpen]);
-
-  // Load chats data
-  useEffect(() => {
-    const savedChats = JSON.parse(localStorage.getItem("chats") || "[]");
-    setChats(savedChats);
-  }, [currentPath]); // Reload chats when path changes
 
   // Set up window resize handler
   useEffect(() => {
@@ -211,7 +205,7 @@ export default function Sidebar() {
                         fontWeight: isActive ? "bold" : "normal",
                       }}
                     >
-                      {chat.title}
+                      {chat.name}
                     </Text>
                   </Button>
                 );
