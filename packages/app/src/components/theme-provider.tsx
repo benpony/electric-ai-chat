@@ -1,6 +1,7 @@
 import { ThemeProvider as NextThemeProvider, useTheme as useNextTheme } from "next-themes";
 import { Theme } from "@radix-ui/themes";
 import { useEffect, useState } from "react";
+import "@radix-ui/themes/styles.css";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
@@ -28,7 +29,7 @@ export function ThemeProvider({
       enableSystem
       themes={['light', 'dark', 'system']}
     >
-      <Theme appearance="inherit" accentColor="gray" grayColor="gray">
+      <Theme appearance="inherit" accentColor="purple" grayColor="gray">
         {children}
       </Theme>
     </NextThemeProvider>

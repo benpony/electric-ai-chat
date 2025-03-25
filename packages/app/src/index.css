@@ -1,12 +1,32 @@
 :root {
+  /* Electric theme colors */
+  --electric-purple: rgb(126, 120, 219);
+  --electric-light-purple: rgb(208, 188, 255);
+  --electric-dark: rgb(27, 27, 31);;
+  --electric-darker: rgb(22, 22, 24);;
+
   /* Custom CSS variables for black and white theme */
   --pure-white: #ffffff;
   --off-white: #f9f9f9;
   --light-gray: #e1e1e1;
   --mid-gray: #a0a0a0;
-  --dark-gray: #505050;
-  --off-black: #121212;
+  --dark-gray: var(--electric-dark);
+  --off-black: var(--electric-darker);
   --pure-black: #000000;
+  
+  /* Override Radix UI theme variables with Electric colors */
+  --purple-1: #f8f7ff;
+  --purple-2: #f0eeff;
+  --purple-3: #e4e0ff;
+  --purple-4: #d4cdff;
+  --purple-5: #c7beff;
+  --purple-6: #b8adff;
+  --purple-7: #a69aff;
+  --purple-8: #9281ff;
+  --purple-9: var(--electric-purple);
+  --purple-10: #6b5dd0;
+  --purple-11: #5e4fc7;
+  --purple-12: #3a2c8a;
 }
 
 /* Light theme */
@@ -20,19 +40,21 @@
   --message-ai-bg: var(--off-white);
   --button-hover: var(--light-gray);
   --active-item-bg: var(--light-gray);
+  --accent-color: var(--electric-purple);
 }
 
 /* Dark theme */
 .dark {
-  --background: var(--off-black);
-  --sidebar-bg: var(--pure-black);
-  --border-color: var(--dark-gray);
+  --background: var(--electric-dark);
+  --sidebar-bg: var(--electric-darker);
+  --border-color: #2A2A2A;
   --text-primary: var(--pure-white);
-  --text-secondary: var(--mid-gray);
-  --message-user-bg: var(--dark-gray);
-  --message-ai-bg: var(--off-black);
-  --button-hover: var(--dark-gray);
-  --active-item-bg: var(--dark-gray);
+  --text-secondary: #A0A0A0;
+  --message-user-bg: #2A2A2A;
+  --message-ai-bg: var(--electric-dark);
+  --button-hover: var(--electric-darker);
+  --active-item-bg: var(--electric-darker);
+  --accent-color: var(--electric-purple);
 }
 
 /* Global styles */
@@ -207,4 +229,75 @@ body {
 
 .typing-dot:nth-child(3) {
   animation-delay: 0.4s;
+}
+
+/* Electric style button and UI element styling */
+.electric-button {
+  background-color: var(--purple-9);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.electric-button:hover {
+  background-color: var(--purple-8);
+  transform: translateY(-1px);
+}
+
+.dark .electric-button {
+  box-shadow: 0 0 12px rgba(126, 120, 219, 0.3);
+}
+
+.dark a, .dark button {
+  color: var(--purple-9);
+}
+
+.dark :focus-visible {
+  outline-color: var(--purple-9);
+}
+
+/* Scrollbar styling for dark mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--electric-darker);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2A2A2A;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3A3A3A;
+}
+
+/* Dark mode sidebar enhancements */
+.dark .sidebar {
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.dark .sidebar-item.active {
+  background-color: rgba(126, 120, 219, 0.15);
+  border-left: 3px solid var(--purple-9);
+}
+
+.dark .sidebar-item:hover:not(.active) {
+  background-color: rgba(126, 120, 219, 0.07);
+}
+
+/* Message styling for dark mode */
+.dark .message.user {
+  background-color: #242424;
+}
+
+.dark .message.ai {
+  background-color: var(--electric-dark);
+  border: 1px solid #242424;
 }
