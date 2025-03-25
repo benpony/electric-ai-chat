@@ -121,14 +121,6 @@ body {
   height: 56px;
 }
 
-/* Messages container */
-.messages-container {
-  flex: 1;
-  overflow: auto;
-  min-height: 0;
-  padding: 16px;
-}
-
 /* Typing indicator animation */
 .typing-indicator {
   display: flex;

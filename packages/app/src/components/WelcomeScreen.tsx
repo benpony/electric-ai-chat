@@ -6,13 +6,18 @@ import {
   Text,
   Heading,
   Button,
+  IconButton,
+  Tooltip,
 } from '@radix-ui/themes';
+import { Sun, Moon, Monitor } from 'lucide-react';
+import { useTheme } from './theme-provider';
 
 export default function WelcomeScreen() {
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,60 +27,64 @@ export default function WelcomeScreen() {
       return;
     }
     
-    // Indicate that we're submitting
     setIsSubmitting(true);
-    
-    // Save username to localStorage
     localStorage.setItem('username', username);
-    
-    // Trigger a custom storage event for the same window
     window.dispatchEvent(new Event('storage'));
-    
-    // Navigate to the home page immediately - no delay
     navigate({ to: '/' });
   };
 
   return (
     <Flex 
       direction="column" 
-      align="center" 
-      justify="center" 
       style={{ 
-        minHeight: '100vh',
-        width: '100%',
-        backgroundColor: 'white'
+        height: '100vh',
+        width: '100vw',
+        position: 'relative'
       }}
     >
-      <Box style={{ 
-        maxWidth: '400px', 
-        width: '100%',
-        padding: '32px',
-        backgroundColor: 'white',
-        boxShadow: '0 0 10px rgba(0, 0, 0, 0.05)'
-      }}>
-        <Flex direction="column" align="center" gap="3" style={{ maxWidth: '320px', margin: '0 auto' }}>
-          <Heading 
-            size="6" 
-            align="center" 
-            style={{
-              height: '56px',
-              borderBottom: '1px solid var(--gray-5)',
-              padding: '0 16px'
+      {/* Theme Toggle */}
+      <Box style={{ position: 'absolute', top: '16px', right: '16px' }}>
+        <Tooltip content={theme === "dark" ? "Light mode" : theme === "light" ? "System mode" : "Dark mode"}>
+          <IconButton
+            size="1"
+            variant="ghost"
+            onClick={() => {
+              if (theme === "dark") setTheme("light");
+              else if (theme === "light") setTheme("system");
+              else setTheme("dark");
             }}
           >
-            Electric Chat
-          </Heading>
-          
-          <Text 
-            size="2" 
+            {theme === "dark" ? <Sun size={14} /> : theme === "light" ? <Monitor size={14} /> : <Moon size={14} />}
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* Main Content */}
+      <Flex 
+        direction="column" 
+        align="center" 
+        justify="center" 
+        style={{ 
+          flex: 1,
+          padding: '16px'
+        }}
+      >
+        <Box style={{ 
+          maxWidth: '480px', 
+          width: '100%',
+          padding: '0 16px'
+        }}>
+          <Heading 
+            size="6" 
+            mb="5"
             align="center"
-            style={{ color: '#666' }}
+            weight="medium"
           >
-            Enter your name to begin chatting
-          </Text>
+            Welcome to Electric Chat
+          </Heading>
 
           <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-            <Flex direction="column" gap="3" align="center" style={{ width: '100%' }}>
+            <Flex direction="column" gap="4" style={{ width: '100%' }}>
               <input
                 type="text"
                 placeholder="Enter your name"
@@ -85,12 +94,12 @@ export default function WelcomeScreen() {
                   setError('');
                 }}
                 style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  fontSize: '14px',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  marginBottom: '8px'
+                  padding: '12px 16px',
+                  fontSize: '16px',
+                  border: '1px solid var(--gray-5)',
+                  borderRadius: '6px',
+                  backgroundColor: 'var(--color-background)',
+                  color: 'var(--gray-12)',
                 }}
                 disabled={isSubmitting}
               />
@@ -103,25 +112,18 @@ export default function WelcomeScreen() {
 
               <Button 
                 type="submit" 
-                size="2"
-                style={{ 
-                  width: '100%',
-                  backgroundColor: '#999',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '8px',
-                  cursor: 'pointer',
-                  opacity: isSubmitting ? 0.7 : 1
-                }}
+                size="3"
                 disabled={isSubmitting}
+                style={{
+                  width: '100%',
+                }}
               >
                 {isSubmitting ? 'Entering...' : 'Enter'}
               </Button>
             </Flex>
           </form>
-        </Flex>
-      </Box>
+        </Box>
+      </Flex>
     </Flex>
   );
 } 

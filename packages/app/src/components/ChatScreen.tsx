@@ -156,7 +156,6 @@ export default function ChatScreen() {
       </Flex>
       
       {/* Messages - Scrollable */}
-      <Box className="messages-container">
         <ScrollArea 
           style={{ height: '100%' }}
           scrollbars="vertical"
@@ -209,7 +208,6 @@ export default function ChatScreen() {
             <div ref={messagesEndRef} />
           </Box>
         </ScrollArea>
-      </Box>
       
       {/* Message Input - Fixed */}
       <Box 
