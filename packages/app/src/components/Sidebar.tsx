@@ -16,6 +16,7 @@ import {
   Sun,
   MessageSquarePlus,
   MessageSquare,
+  Monitor,
 } from "lucide-react";
 import { Chat } from "../lib/utils";
 import { useTheme } from "./theme-provider";
@@ -231,13 +232,17 @@ export default function Sidebar() {
               <Text size="1">{username}</Text>
             </Flex>
             <Flex gap="3">
-              <Tooltip content={theme === "dark" ? "Light mode" : "Dark mode"}>
+              <Tooltip content={theme === "dark" ? "Light mode" : theme === "light" ? "System mode" : "Dark mode"}>
                 <IconButton
                   size="1"
                   variant="ghost"
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  onClick={() => {
+                    if (theme === "dark") setTheme("light");
+                    else if (theme === "light") setTheme("system");
+                    else setTheme("dark");
+                  }}
                 >
-                  {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+                  {theme === "dark" ? <Sun size={14} /> : theme === "light" ? <Monitor size={14} /> : <Moon size={14} />}
                 </IconButton>
               </Tooltip>
               <Tooltip content="Log out">

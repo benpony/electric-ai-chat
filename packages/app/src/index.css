@@ -10,7 +10,7 @@
 }
 
 /* Light theme */
-.light-theme {
+.light {
   --background: var(--pure-white);
   --sidebar-bg: var(--off-white);
   --border-color: var(--light-gray);
@@ -23,7 +23,7 @@
 }
 
 /* Dark theme */
-.dark-theme {
+.dark {
   --background: var(--off-black);
   --sidebar-bg: var(--pure-black);
   --border-color: var(--dark-gray);

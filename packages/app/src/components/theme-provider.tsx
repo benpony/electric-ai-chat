@@ -1,55 +1,41 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { ThemeProvider as NextThemeProvider, useTheme as useNextTheme } from "next-themes";
 import { Theme } from "@radix-ui/themes";
+import { useEffect, useState } from "react";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
-  defaultTheme?: 'light' | 'dark';
+  defaultTheme?: 'light' | 'dark' | 'system';
 };
-
-type ThemeContextType = {
-  theme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark') => void;
-};
-
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({
   children,
-  defaultTheme = 'light',
+  defaultTheme = 'system',
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<'light' | 'dark'>(
-    () => (localStorage.getItem('theme') as 'light' | 'dark') || defaultTheme
-  );
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    
-    root.classList.remove('light-theme', 'dark-theme');
-    root.classList.add(`${theme}-theme`);
-    
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    setMounted(true);
+  }, []);
 
-  const value = {
-    theme,
-    setTheme,
-  };
+  if (!mounted) {
+    return null;
+  }
 
   return (
-    <ThemeContext.Provider value={value}>
-      <Theme appearance={theme} accentColor="gray" grayColor="gray">
+    <NextThemeProvider
+      attribute="class"
+      defaultTheme={defaultTheme}
+      enableSystem
+      themes={['light', 'dark', 'system']}
+    >
+      <Theme appearance="inherit" accentColor="gray" grayColor="gray">
         {children}
       </Theme>
-    </ThemeContext.Provider>
+    </NextThemeProvider>
   );
 }
 
 export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  
-  return context;
-} 
+  const { theme, setTheme } = useNextTheme();
+  return { theme, setTheme };
+}; 
