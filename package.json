@@ -1,0 +1,17 @@
+{
+  "name": "electric-chat",
+  "version": "1.0.0",
+  "description": "Multi-user AI chat application",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter app dev",
+    "build": "pnpm --filter app build",
+    "preview": "pnpm --filter app preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "workspaces": [
+    "packages/*"
+  ]
+}

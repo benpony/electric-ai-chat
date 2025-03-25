@@ -1,0 +1,13 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "description": "API for Electric Chat",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"API development server will be implemented later.\" && exit 0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
