@@ -57,9 +57,10 @@ export default function WelcomeScreen() {
           <Heading 
             size="6" 
             align="center" 
-            style={{ 
-              color: '#333',
-              fontWeight: 'normal'
+            style={{
+              height: '56px',
+              borderBottom: '1px solid var(--gray-5)',
+              padding: '0 16px'
             }}
           >
             Electric Chat
