@@ -1,0 +1,26 @@
+CREATE TABLE IF NOT EXISTS chats (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    name TEXT
+);
+
+CREATE TYPE message_status AS ENUM ('pending', 'completed', 'failed');
+CREATE TYPE message_role AS ENUM ('user', 'agent');
+
+CREATE TABLE IF NOT EXISTS messages (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    chat_id UUID REFERENCES chats(id),
+    content TEXT,
+    user_name TEXT,
+    role message_role,
+    status message_status
+);
+
+CREATE TABLE IF NOT EXISTS tokens (
+    message_id UUID REFERENCES messages(id),
+    token_number INTEGER,
+    token_text TEXT,
+    PRIMARY KEY (message_id, token_number)
+);
