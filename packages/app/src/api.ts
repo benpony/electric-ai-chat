@@ -15,6 +15,7 @@ export interface Chat {
 export interface CreateChatRequest {
   message: string;
   user: string;
+  id?: string; // Client-provided UUID
 }
 
 export interface CreateMessageRequest {
@@ -28,8 +29,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 /**
  * Create a new chat with an initial message
  */
-export async function createChat(message: string, user: string): Promise<Chat> {
-  const payload: CreateChatRequest = { message, user };
+export async function createChat(message: string, user: string, id?: string): Promise<Chat> {
+  const payload: CreateChatRequest = { message, user, id };
   
   const response = await fetch(`${API_URL}/api/chats`, {
     method: 'POST',

@@ -13,6 +13,7 @@ import { matchStream } from "@electric-sql/experimental";
 import { toggleSidebar } from "./Sidebar";
 import { createChat } from "../api";
 import { useChatsShape } from "../shapes";
+import { v4 as uuidv4 } from "uuid";
 
 export default function NewChatScreen() {
   const [prompt, setPrompt] = useState("");
@@ -38,19 +39,29 @@ export default function NewChatScreen() {
 
     try {
       setIsLoading(true);
-
-      // Create a new chat via API
-      const chat = await createChat(prompt.trim(), username);
-
-      // Wait for the chat to sync
-      await matchStream(
+      
+      // Generate a UUID for the new chat
+      const chatId = uuidv4();
+      
+      // Start watching for the chat to sync BEFORE making the API call
+      const matchPromise = matchStream(
         stream,
         ["insert"],
-        (message) => message.value.id === chat.id
+        (message) => {
+          console.log('message id', message.value.id);
+          return message.value.id === chatId;
+        }
       );
 
+      // Create a new chat via API with the pre-generated UUID
+      await createChat(prompt.trim(), username, chatId);
+
+      // Wait for the chat to sync
+      await matchPromise;
+      console.log("Chat synced");
+
       // Navigate to the new chat
-      navigate({ to: `/chat/${chat.id}` });
+      navigate({ to: `/chat/${chatId}` });
     } catch (error) {
       console.error("Failed to create chat:", error);
       // Could add error handling/display here

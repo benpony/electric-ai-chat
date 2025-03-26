@@ -7,6 +7,8 @@ import { randomUUID } from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 
+const ENABLE_AI = true;
+
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_KEY,
@@ -32,6 +34,7 @@ interface Chat {
 interface CreateChatRequest {
   message: string;
   user: string;
+  id?: string; // Optional client-provided ID
 }
 
 interface CreateMessageRequest {
@@ -191,7 +194,7 @@ app.get('/api/chats/:id', async (c: Context) => {
 // Create a new chat
 app.post('/api/chats', async (c: Context) => {
   const body = await c.req.json();
-  const { message, user } = body as CreateChatRequest;
+  const { message, user, id } = body as CreateChatRequest;
   
   if (!message || !user) {
     return c.json({ error: 'Message and user are required' }, 400);
@@ -201,8 +204,8 @@ app.post('/api/chats', async (c: Context) => {
     // Extract chat name from first message (limit to 120 characters)
     const chatName = message.slice(0, 120);
     
-    // Generate UUID for the chat
-    const chatId = randomUUID();
+    // Use client-provided ID or generate one
+    const chatId = id || randomUUID();
     
     // Insert new chat and first message
     const chat = await db.begin(async (sql) => {
@@ -225,6 +228,10 @@ app.post('/api/chats', async (c: Context) => {
       
       return { ...newChat, messages: [rowToChatMessage(newMessage)] } as Chat;
     });
+
+    if (!ENABLE_AI) {
+      return c.json({ chat }, 201);
+    }
     
     // Trigger AI response
     const messages = await db`
@@ -276,6 +283,13 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
       RETURNING id, content, user_name, role, status, created_at
     `;
     
+    // If AI is disabled, return the user message only
+    if (!ENABLE_AI) {
+      return c.json({ 
+        messages: [rowToChatMessage(newMessage)],
+      }, 201);
+    }
+
     // Get all messages for context
     const messages = await db`
       SELECT id, content, user_name, role, status, created_at
