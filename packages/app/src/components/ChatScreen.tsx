@@ -52,23 +52,24 @@ export default function ChatScreen() {
   useEffect(() => {
     const handleScroll = () => {
       if (!scrollAreaRef.current) return;
-      
+
       const { scrollTop, scrollHeight, clientHeight } = scrollAreaRef.current;
       const isAtBottom = scrollHeight - scrollTop - clientHeight < 20; // 20px threshold
       setShouldScrollToBottom(isAtBottom);
     };
-    
+
     const scrollAreaElement = scrollAreaRef.current;
     if (scrollAreaElement) {
-      scrollAreaElement.addEventListener('scroll', handleScroll);
-      return () => scrollAreaElement.removeEventListener('scroll', handleScroll);
+      scrollAreaElement.addEventListener("scroll", handleScroll);
+      return () =>
+        scrollAreaElement.removeEventListener("scroll", handleScroll);
     }
   }, []);
 
   // Set up mutation observer to detect content changes
   useEffect(() => {
     if (!scrollContentRef.current) return;
-    
+
     // Function to scroll to bottom if needed
     const scrollToBottomIfNeeded = () => {
       if (shouldScrollToBottom && messagesEndRef.current) {
@@ -79,25 +80,26 @@ export default function ChatScreen() {
     // Create mutation observer
     const observer = new MutationObserver((mutations) => {
       // Check if there were meaningful changes that should trigger a scroll
-      const hasContentChanges = mutations.some(mutation => 
-        mutation.type === 'childList' || 
-        mutation.type === 'characterData' ||
-        (mutation.type === 'attributes' && mutation.attributeName === 'style')
+      const hasContentChanges = mutations.some(
+        (mutation) =>
+          mutation.type === "childList" ||
+          mutation.type === "characterData" ||
+          (mutation.type === "attributes" && mutation.attributeName === "style")
       );
-      
+
       if (hasContentChanges) {
         scrollToBottomIfNeeded();
       }
     });
-    
+
     // Start observing
     observer.observe(scrollContentRef.current, {
-      childList: true,      // Observe direct children changes
-      subtree: true,        // Observe all descendants
-      characterData: true,  // Observe text content changes
-      attributes: true,     // Observe attribute changes
+      childList: true, // Observe direct children changes
+      subtree: true, // Observe all descendants
+      characterData: true, // Observe text content changes
+      attributes: true, // Observe attribute changes
     });
-    
+
     // Cleanup
     return () => observer.disconnect();
   }, [shouldScrollToBottom]);
@@ -111,18 +113,18 @@ export default function ChatScreen() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!message.trim()) return;
-    
+
     try {
       setIsLoading(true);
-      
+
       // Send message to API
       await addMessage(chatId, message.trim(), username);
-      
+
       // Clear input
       setMessage("");
-      
+
       // Force scroll to bottom when user sends a message
       setShouldScrollToBottom(true);
     } catch (error) {
@@ -172,8 +174,8 @@ export default function ChatScreen() {
       </Flex>
 
       {/* Messages - Scrollable */}
-      <ScrollArea 
-        style={{ height: "100%" }} 
+      <ScrollArea
+        style={{ height: "100%" }}
         scrollbars="vertical"
         ref={scrollAreaRef}
       >
@@ -182,60 +184,68 @@ export default function ChatScreen() {
           style={{ display: "flex", flexDirection: "column", gap: "12px" }}
           ref={scrollContentRef}
         >
-          {messages.map((msg) => (
-            <Flex
-              key={msg.id}
-              justify={
-                msg.role === "agent" ? "center" : msg.user_name === username ? "end" : "start"
-              }
-            >
-              {msg.role === "agent" ? (
-                <AiResponse message={msg} />
-              ) : (
-                <Flex
-                  direction="column"
-                  style={{
-                    maxWidth: "60%",
-                    marginBottom: "10px",
-                    alignItems:
-                      msg.user_name === username ? "flex-end" : "flex-start",
-                  }}
-                >
-                  {msg.user_name !== username && (
-                    <Text
-                      size="1"
-                      style={{
-                        color: "var(--gray-11)",
-                        marginLeft: "4px",
-                        marginBottom: "3px",
-                      }}
-                    >
-                      {msg.user_name}
-                    </Text>
-                  )}
-                  <Box
+          {messages
+            .sort((a, b) => a.created_at.getTime() - b.created_at.getTime())
+            .map((msg) => (
+              <Flex
+                key={msg.id}
+                justify={
+                  msg.role === "agent"
+                    ? "center"
+                    : msg.user_name === username
+                    ? "end"
+                    : "start"
+                }
+              >
+                {msg.role === "agent" ? (
+                  <AiResponse message={msg} />
+                ) : (
+                  <Flex
+                    direction="column"
                     style={{
-                      backgroundColor:
-                        msg.user_name === username
-                          ? "var(--accent-9)"
-                          : "var(--color-background-message)",
-                      color:
-                        msg.user_name === username ? "white" : "var(--gray-12)",
-                      padding: "8px 12px",
-                      borderRadius: "18px",
-                      position: "relative",
-                      maxWidth: "fit-content",
-                      boxShadow: "var(--shadow-message)",
+                      maxWidth: "60%",
+                      marginBottom: "10px",
+                      alignItems:
+                        msg.user_name === username ? "flex-end" : "flex-start",
                     }}
                   >
-                    <Text size="2" style={{ whiteSpace: "pre-wrap" }}>
-                      {msg.content}
-                    </Text>
-                  </Box>
-                </Flex>
-              )}
-            </Flex>
-          ))}
+                    {msg.user_name !== username && (
+                      <Text
+                        size="1"
+                        style={{
+                          color: "var(--gray-11)",
+                          marginLeft: "4px",
+                          marginBottom: "3px",
+                        }}
+                      >
+                        {msg.user_name}
+                      </Text>
+                    )}
+                    <Box
+                      style={{
+                        backgroundColor:
+                          msg.user_name === username
+                            ? "var(--accent-9)"
+                            : "var(--color-background-message)",
+                        color:
+                          msg.user_name === username
+                            ? "white"
+                            : "var(--gray-12)",
+                        padding: "8px 12px",
+                        borderRadius: "18px",
+                        position: "relative",
+                        maxWidth: "fit-content",
+                        boxShadow: "var(--shadow-message)",
+                      }}
+                    >
+                      <Text size="2" style={{ whiteSpace: "pre-wrap" }}>
+                        {msg.content}
+                      </Text>
+                    </Box>
+                  </Flex>
+                )}
+              </Flex>
+            ))}
 
           {/* {isLoading && (
               <Flex justify="center">
@@ -269,7 +279,13 @@ export default function ChatScreen() {
                 onChange={(e) => setMessage(e.target.value)}
                 disabled={isLoading}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                  if (
+                    e.key === "Enter" &&
+                    !e.shiftKey &&
+                    !e.altKey &&
+                    !e.ctrlKey &&
+                    !e.metaKey
+                  ) {
                     e.preventDefault();
                     if (message.trim() && !isLoading) {
                       handleSubmit(e);
@@ -278,7 +294,11 @@ export default function ChatScreen() {
                 }}
               />
             </Box>
-            <Button type="submit" size="3" disabled={!message.trim() || isLoading}>
+            <Button
+              type="submit"
+              size="3"
+              disabled={!message.trim() || isLoading}
+            >
               Send
             </Button>
           </Flex>

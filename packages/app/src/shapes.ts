@@ -59,6 +59,7 @@ export interface Message extends MessageRow {
   user_name: string;
   role: string;
   status: string;
+  created_at: Date;
 }
 
 export function messagesShapeConfig(chatId: string): ShapeOptions<Message> {
@@ -76,6 +77,16 @@ export function messagesShapeConfig(chatId: string): ShapeOptions<Message> {
 
 export function useMessagesShape(chatId: string) {
   return useShape(messagesShapeConfig(chatId));
+}
+
+export async function preloadMessages(chatId: string) {
+  await preloadShape({
+    url: `${ELECTRIC_API_URL}/v1/shape`,
+    params: {
+      table: "messages",
+      where: `chat_id = '${chatId}'`,
+    },
+  });
 }
 
 // Token Shape

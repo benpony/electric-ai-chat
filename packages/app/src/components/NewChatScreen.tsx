@@ -12,7 +12,7 @@ import { Send, Menu } from "lucide-react";
 import { matchStream } from "@electric-sql/experimental";
 import { toggleSidebar } from "./Sidebar";
 import { createChat } from "../api";
-import { useChatsShape } from "../shapes";
+import { useChatsShape, preloadMessages } from "../shapes";
 import { v4 as uuidv4 } from "uuid";
 
 export default function NewChatScreen() {
@@ -59,6 +59,9 @@ export default function NewChatScreen() {
       // Wait for the chat to sync
       await matchPromise;
       console.log("Chat synced");
+
+      // Preload messages for the new chat
+      await preloadMessages(chatId);
 
       // Navigate to the new chat
       navigate({ to: `/chat/${chatId}` });
