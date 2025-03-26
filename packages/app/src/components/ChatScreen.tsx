@@ -14,6 +14,7 @@ import { toggleSidebar } from "./Sidebar";
 import { useChat, useMessagesShape } from "../shapes";
 import { addMessage } from "../api";
 import AiResponse from "./AiResponse";
+
 export default function ChatScreen() {
   const { chatId } = useParams({ from: "/chat/$chatId" });
   const chat = useChat(chatId);
@@ -22,6 +23,9 @@ export default function ChatScreen() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollContentRef = useRef<HTMLDivElement>(null);
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
   const username = localStorage.getItem("username") || "User";
 
   // Define CSS variables for theming that will adapt to dark mode
@@ -44,10 +48,66 @@ export default function ChatScreen() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Check if user is scrolled to bottom
   useEffect(() => {
-    // Scroll to bottom whenever messages change
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat?.messages]);
+    const handleScroll = () => {
+      if (!scrollAreaRef.current) return;
+      
+      const { scrollTop, scrollHeight, clientHeight } = scrollAreaRef.current;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 20; // 20px threshold
+      setShouldScrollToBottom(isAtBottom);
+    };
+    
+    const scrollAreaElement = scrollAreaRef.current;
+    if (scrollAreaElement) {
+      scrollAreaElement.addEventListener('scroll', handleScroll);
+      return () => scrollAreaElement.removeEventListener('scroll', handleScroll);
+    }
+  }, []);
+
+  // Set up mutation observer to detect content changes
+  useEffect(() => {
+    if (!scrollContentRef.current) return;
+    
+    // Function to scroll to bottom if needed
+    const scrollToBottomIfNeeded = () => {
+      if (shouldScrollToBottom && messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    };
+
+    // Create mutation observer
+    const observer = new MutationObserver((mutations) => {
+      // Check if there were meaningful changes that should trigger a scroll
+      const hasContentChanges = mutations.some(mutation => 
+        mutation.type === 'childList' || 
+        mutation.type === 'characterData' ||
+        (mutation.type === 'attributes' && mutation.attributeName === 'style')
+      );
+      
+      if (hasContentChanges) {
+        scrollToBottomIfNeeded();
+      }
+    });
+    
+    // Start observing
+    observer.observe(scrollContentRef.current, {
+      childList: true,      // Observe direct children changes
+      subtree: true,        // Observe all descendants
+      characterData: true,  // Observe text content changes
+      attributes: true,     // Observe attribute changes
+    });
+    
+    // Cleanup
+    return () => observer.disconnect();
+  }, [shouldScrollToBottom]);
+
+  useEffect(() => {
+    // Scroll to bottom on initial load and when messages change, if shouldScrollToBottom is true
+    if (shouldScrollToBottom && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, shouldScrollToBottom]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +122,9 @@ export default function ChatScreen() {
       
       // Clear input
       setMessage("");
+      
+      // Force scroll to bottom when user sends a message
+      setShouldScrollToBottom(true);
     } catch (error) {
       console.error("Failed to send message:", error);
       // Could add error handling/display here
@@ -109,10 +172,15 @@ export default function ChatScreen() {
       </Flex>
 
       {/* Messages - Scrollable */}
-      <ScrollArea style={{ height: "100%" }} scrollbars="vertical">
+      <ScrollArea 
+        style={{ height: "100%" }} 
+        scrollbars="vertical"
+        ref={scrollAreaRef}
+      >
         <Box
           p="3"
           style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          ref={scrollContentRef}
         >
           {messages.map((msg) => (
             <Flex
