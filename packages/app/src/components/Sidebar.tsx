@@ -176,7 +176,7 @@ export default function Sidebar() {
               RECENT CHATS
             </Text>
             <Flex direction="column" gap="1" style={{ paddingTop: "4px" }}>
-              {chats.map((chat) => {
+              {chats.sort((a, b) => b.created_at.getTime() - a.created_at.getTime()).map((chat) => {
                 const chatPath = `/chat/${chat.id}`;
                 const isActive = currentPath === chatPath;
 

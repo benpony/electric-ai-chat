@@ -117,6 +117,14 @@ export default function NewChatScreen() {
               paddingRight: "56px",
               resize: "none",
             }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                if (prompt.trim()) {
+                  handleSubmit(e);
+                }
+              }
+            }}
           />
 
           <Box style={{ position: "absolute", bottom: "12px", right: "12px" }}>

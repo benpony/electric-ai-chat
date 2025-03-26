@@ -59,7 +59,7 @@ function PendingMessage({ message }: { message: Message }) {
   );
 }
 
-function FailedMessage({ message }: { message: Message }) {
+function FailedMessage({}: { message: Message }) {
   return (
     <Box>
       <Text>Failed to generate response</Text>

@@ -268,6 +268,14 @@ export default function ChatScreen() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 disabled={isLoading}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    if (message.trim() && !isLoading) {
+                      handleSubmit(e);
+                    }
+                  }
+                }}
               />
             </Box>
             <Button type="submit" size="3" disabled={!message.trim() || isLoading}>
