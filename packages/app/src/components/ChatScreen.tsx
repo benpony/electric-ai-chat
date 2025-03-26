@@ -13,7 +13,7 @@ import { Menu } from "lucide-react";
 import { toggleSidebar } from "./Sidebar";
 import { useChat, useMessagesShape } from "../shapes";
 import { addMessage } from "../api";
-
+import AiResponse from "./AiResponse";
 export default function ChatScreen() {
   const { chatId } = useParams({ from: "/chat/$chatId" });
   const chat = useChat(chatId);
@@ -118,28 +118,11 @@ export default function ChatScreen() {
             <Flex
               key={msg.id}
               justify={
-                msg.isAI ? "center" : msg.user_name === username ? "end" : "start"
+                msg.role === "agent" ? "center" : msg.user_name === username ? "end" : "start"
               }
             >
-              {msg.isAI ? (
-                <Box
-                  style={{
-                    maxWidth: "800px",
-                    width: "100%",
-                  }}
-                >
-                  <Flex justify="start">
-                    <Text
-                      size="2"
-                      style={{
-                        whiteSpace: "pre-wrap",
-                        color: "var(--gray-12)",
-                      }}
-                    >
-                      {msg.content}
-                    </Text>
-                  </Flex>
-                </Box>
+              {msg.role === "agent" ? (
+                <AiResponse message={msg} />
               ) : (
                 <Flex
                   direction="column"
