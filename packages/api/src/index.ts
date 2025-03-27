@@ -156,19 +156,36 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
   let fullContent = '';
 
   // Process each chunk as it arrives
+  let tokenBuffer = '';
+  let lastInsertTime = 0;
+  
   for await (const chunk of stream) {
     const content = chunk.choices[0]?.delta?.content || '';
     if (content) {
       fullContent += content;
+      tokenBuffer += content;
 
-      // Store token in the tokens table
-      await db`
-        INSERT INTO tokens (message_id, token_number, token_text)
-        VALUES (${messageId}, ${tokenNumber}, ${content})
-      `;
+      const currentTime = Date.now();
+      if (currentTime - lastInsertTime >= 60 || tokenBuffer.length > 100) {
+        // Store token batch in the tokens table
+        await db`
+          INSERT INTO tokens (message_id, token_number, token_text)
+          VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
+        `;
 
-      tokenNumber++;
+        tokenNumber++;
+        tokenBuffer = '';
+        lastInsertTime = currentTime;
+      }
     }
+  }
+
+  // Insert any remaining tokens in the buffer
+  if (tokenBuffer) {
+    await db`
+      INSERT INTO tokens (message_id, token_number, token_text)
+      VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
+    `;
   }
 
   // Update the message with the complete content
