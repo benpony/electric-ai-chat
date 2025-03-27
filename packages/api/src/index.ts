@@ -6,8 +6,10 @@ import { db } from './db.js';
 import { randomUUID } from 'crypto';
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import { Shape, ShapeStream } from '@electric-sql/client';
 
 const ENABLE_AI = true;
+const ELECTRIC_API_URL = process.env.ELECTRIC_API_URL || 'http://localhost:3000';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -139,6 +141,39 @@ async function createAIResponse(chatId: string, contextRows: any[]) {
 
 // Process AI stream in background
 async function processAIStream(chatId: string, messageId: string, context: ChatMessage[]) {
+  // This abort controller is used to abort the message stream but also to
+  // cancel the OpenAI stream when the message is aborted.
+  const abortController = new AbortController();
+  abortController.signal.addEventListener('abort', () => {
+    // Wait 1 second, then delete tokens
+    setTimeout(async () => {
+      try {
+        await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
+      } catch (err) {
+        console.error('Error deleting tokens:', err);
+      }
+    }, 1000);
+  });
+
+  // Subscribe to the message
+  const messageStream = new ShapeStream<{ id: string; status: string }>({
+    url: `${ELECTRIC_API_URL}/v1/shape`,
+    params: {
+      table: 'messages',
+      where: `id = '${messageId}'`,
+      columns: ['id', 'status'],
+    },
+    signal: abortController.signal,
+  });
+  const messageShape = new Shape(messageStream);
+  messageShape.subscribe(({ rows }) => {
+    // Abort the message stream if the message is aborted
+    const message = rows[0];
+    if (message && message.status === 'aborted') {
+      abortController.abort();
+    }
+  });
+
   // Convert chat history to OpenAI format
   const messages: ChatCompletionMessageParam[] = context.map(msg => ({
     role: msg.role === 'agent' ? 'assistant' : 'user',
@@ -146,11 +181,15 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
   }));
 
   // Call OpenAI with streaming
-  const stream = await openai.chat.completions.create({
+  const streamPromise = openai.chat.completions.create({
     model: 'gpt-4o',
     messages,
     stream: true,
   });
+  abortController.signal.addEventListener('abort', async () => {
+    (await streamPromise).controller.abort();
+  });
+  const stream = await streamPromise;
 
   let tokenNumber = 0;
   let fullContent = '';
@@ -158,7 +197,7 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
   // Process each chunk as it arrives
   let tokenBuffer = '';
   let lastInsertTime = 0;
-  
+
   for await (const chunk of stream) {
     const content = chunk.choices[0]?.delta?.content || '';
     if (content) {
@@ -191,18 +230,12 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
   // Update the message with the complete content
   await db`
     UPDATE messages
-    SET content = ${fullContent}, status = 'completed'
+    SET content = ${fullContent}, status = ${abortController.signal.aborted ? 'aborted' : 'completed'}
     WHERE id = ${messageId}
   `;
 
-  // Wait 1 second, then delete tokens
-  setTimeout(async () => {
-    try {
-      await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
-    } catch (err) {
-      console.error('Error deleting tokens:', err);
-    }
-  }, 1000);
+  // Abort the message stream
+  abortController.abort();
 }
 
 // Get chat messages
@@ -383,6 +416,48 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
   } catch (err) {
     console.error('Error adding message:', err);
     return c.json({ error: 'Failed to add message' }, 500);
+  }
+});
+
+// Abort an in-progress message
+app.post('/api/messages/:id/abort', async (c: Context) => {
+  const messageId = c.req.param('id');
+
+  try {
+    // Use a transaction to check the message status and update it atomically
+    const result = await db.begin(async sql => {
+      // Check if message exists and is in pending state
+      const [message] = await sql`
+        SELECT id, status FROM messages WHERE id = ${messageId}
+      `;
+
+      if (!message) {
+        return { error: 'Message not found', status: 404 };
+      }
+
+      if (message.status !== 'pending') {
+        return { error: 'Only pending messages can be aborted', status: 400 };
+      }
+
+      // Update message status to aborted
+      await sql`
+        UPDATE messages
+        SET status = 'aborted'
+        WHERE id = ${messageId}
+      `;
+
+      return { success: true };
+    });
+
+    // Handle transaction result
+    if (result.error) {
+      return c.json({ error: result.error }, result.status);
+    }
+
+    return c.json(result);
+  } catch (err) {
+    console.error('Error aborting message:', err);
+    return c.json({ error: 'Failed to abort message' }, 500);
   }
 });
 

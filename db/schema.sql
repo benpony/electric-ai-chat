@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS chats (
     name TEXT
 );
 
-CREATE TYPE message_status AS ENUM ('pending', 'completed', 'failed');
+CREATE TYPE message_status AS ENUM ('pending', 'completed', 'failed', 'aborted');
 CREATE TYPE message_role AS ENUM ('user', 'agent');
 
 CREATE TABLE IF NOT EXISTS messages (

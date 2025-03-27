@@ -1,0 +1,6 @@
+node_modules
+dist
+build
+.electric
+coverage
+pnpm-lock.yaml 

@@ -1,10 +1,13 @@
-import { Flex, Text, Box } from '@radix-ui/themes';
+import { Flex, Text, Box, IconButton, Tooltip } from '@radix-ui/themes';
 import { Message, useTokensShape } from '../shapes';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme } from './theme-provider';
+import { abortMessage } from '../api';
+import { useState } from 'react';
+import { Loader, OctagonX } from 'lucide-react';
 
 function MarkdownMessage({ content }: { content: string }) {
   const { theme } = useTheme();
@@ -126,6 +129,8 @@ export default function AiResponse({ message }: { message: Message }) {
     return <CompletedMessage message={message} />;
   } else if (message.status === 'pending') {
     return <PendingMessage message={message} />;
+  } else if (message.status === 'aborted') {
+    return <AbortedMessage message={message} />;
   } else {
     return <FailedMessage message={message} />;
   }
@@ -138,14 +143,65 @@ function CompletedMessage({ message }: { message: Message }) {
 function PendingMessage({ message }: { message: Message }) {
   const { data: tokens } = useTokensShape(message.id);
   const tokenText = tokens?.map(token => token.token_text).join('');
+  const [isAborting, setIsAborting] = useState(false);
 
-  return <MarkdownMessage content={tokenText || ''} />;
+  const handleAbort = async () => {
+    try {
+      setIsAborting(true);
+      await abortMessage(message.id);
+      // The shape subscription will update the UI when the message status changes
+    } catch (err) {
+      console.error('Failed to abort message:', err);
+      setIsAborting(false);
+    }
+  };
+
+  return (
+    <Box position="relative" width="100%">
+      <MarkdownMessage content={tokenText || ''} />
+      <Box position="absolute" top="0" right="6" style={{ zIndex: 100, top: '-10px' }}>
+        <Tooltip content="Stop generating">
+          <IconButton
+            size="1"
+            variant="ghost"
+            color="ruby"
+            onClick={handleAbort}
+            disabled={isAborting}
+            style={{
+              padding: '0',
+              width: '28px',
+              height: '28px',
+            }}
+          >
+            {isAborting ? (
+              <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <OctagonX size={14} />
+            )}
+          </IconButton>
+        </Tooltip>
+      </Box>
+    </Box>
+  );
 }
 
 function FailedMessage({}: { message: Message }) {
   return (
-    <Box px="4">
-      <Text>Failed to generate response</Text>
+    <Box px="6" width="100%">
+      <Text color="ruby">Failed to generate response</Text>
+    </Box>
+  );
+}
+
+function AbortedMessage({ message }: { message: Message }) {
+  return (
+    <Box width="100%">
+      <MarkdownMessage content={message.content || ''} />
+      <Box px="6">
+        <Text color="ruby" size="2">
+          Generation stopped
+        </Text>
+      </Box>
     </Box>
   );
 }

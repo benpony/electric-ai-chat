@@ -4,6 +4,8 @@ export interface ChatMessage {
   content: string;
   user_name: string;
   created_at: Date;
+  role?: 'user' | 'agent';
+  status?: 'pending' | 'completed' | 'failed' | 'aborted';
 }
 
 export interface Chat {
@@ -74,4 +76,23 @@ export async function addMessage(
 
   const data = await response.json();
   return data.message;
+}
+
+/**
+ * Abort an in-progress AI message
+ */
+export async function abortMessage(messageId: string): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_URL}/api/messages/${messageId}/abort`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to abort message');
+  }
+
+  return response.json();
 }
