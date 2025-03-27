@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "pnpm --filter app dev",
     "build": "pnpm --filter app build",
-    "preview": "pnpm --filter app preview"
+    "preview": "pnpm --filter app preview",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md}\""
   },
   "keywords": [],
   "author": "",
@@ -17,5 +19,8 @@
   "dependencies": {
     "@types/react-syntax-highlighter": "^15.5.13",
     "react-syntax-highlighter": "^15.6.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.4"
   }
 }

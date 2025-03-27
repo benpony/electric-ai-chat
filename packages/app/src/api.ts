@@ -31,7 +31,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
  */
 export async function createChat(message: string, user: string, id?: string): Promise<Chat> {
   const payload: CreateChatRequest = { message, user, id };
-  
+
   const response = await fetch(`${API_URL}/api/chats`, {
     method: 'POST',
     headers: {
@@ -52,9 +52,13 @@ export async function createChat(message: string, user: string, id?: string): Pr
 /**
  * Add a message to an existing chat
  */
-export async function addMessage(chatId: number | string, message: string, user: string): Promise<ChatMessage> {
+export async function addMessage(
+  chatId: number | string,
+  message: string,
+  user: string
+): Promise<ChatMessage> {
   const payload: CreateMessageRequest = { message, user };
-  
+
   const response = await fetch(`${API_URL}/api/chats/${chatId}/messages`, {
     method: 'POST',
     headers: {

@@ -15,6 +15,7 @@ A multi-user AI chat application, it demonstrates the use of ElectricSQL for syn
 Electric Chat is built using a modern architecture with these key components:
 
 1. **Frontend Application (packages/app)**
+
    - React-based single-page application
    - Uses TanStack Router for client-side routing
    - Uses Radix UI and Tailwind CSS for UI components
@@ -22,11 +23,13 @@ Electric Chat is built using a modern architecture with these key components:
    - Connects to ElectricSQL for local-first data management
 
 2. **Backend API (packages/api)**
+
    - Node.js API server using Hono web framework
    - Provides REST endpoints for chat operations
    - Handles user authentication and message processing
 
 3. **Database Layer**
+
    - PostgreSQL database with ElectricSQL
    - Schemas for chats, messages, and token storage
    - ElectricSQL for real-time sync between clients and server
@@ -110,4 +113,4 @@ electric-chat/
 - `POST /api/chats` - Create a new chat
 - `POST /api/chats/:id/messages` - Add a message to a chat
 
-See the API documentation in packages/api/README.md for more details. 
+See the API documentation in packages/api/README.md for more details.

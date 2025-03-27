@@ -2,8 +2,8 @@
   /* Electric theme colors */
   --electric-purple: rgb(126, 120, 219);
   --electric-light-purple: rgb(208, 188, 255);
-  --electric-dark: rgb(27, 27, 31);;
-  --electric-darker: rgb(22, 22, 24);;
+  --electric-dark: rgb(27, 27, 31);
+  --electric-darker: rgb(22, 22, 24);
 
   /* Custom CSS variables for black and white theme */
   --pure-white: #ffffff;
@@ -13,7 +13,7 @@
   --dark-gray: var(--electric-dark);
   --off-black: var(--electric-darker);
   --pure-black: #000000;
-  
+
   /* Override Radix UI theme variables with Electric colors */
   --purple-1: #f8f7ff;
   --purple-2: #f0eeff;
@@ -47,10 +47,10 @@
 .dark {
   --background: var(--electric-dark);
   --sidebar-bg: var(--electric-darker);
-  --border-color: #2A2A2A;
+  --border-color: #2a2a2a;
   --text-primary: var(--pure-white);
-  --text-secondary: #A0A0A0;
-  --message-user-bg: #2A2A2A;
+  --text-secondary: #a0a0a0;
+  --message-user-bg: #2a2a2a;
   --message-ai-bg: var(--electric-dark);
   --button-hover: var(--electric-darker);
   --active-item-bg: var(--electric-darker);
@@ -58,13 +58,19 @@
 }
 
 /* Global styles */
-html, body, #root {
+html,
+body,
+#root {
   height: 100vh;
   width: 100vw;
   margin: 0;
   padding: 0;
   overflow: hidden;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
 }
 
 body {
@@ -107,11 +113,11 @@ body {
     transform: translateX(-100%);
     transition: transform 0.3s ease-in-out;
   }
-  
+
   .sidebar.open {
     transform: translateX(0);
   }
-  
+
   .sidebar-overlay {
     position: fixed;
     top: 0;
@@ -124,7 +130,7 @@ body {
     pointer-events: none;
     transition: opacity 0.3s ease-in-out;
   }
-  
+
   .sidebar-overlay.open {
     opacity: 1;
     pointer-events: auto;
@@ -177,7 +183,9 @@ body {
 }
 
 @keyframes typing-dot {
-  0%, 60%, 100% {
+  0%,
+  60%,
+  100% {
     transform: translateY(0);
   }
   30% {
@@ -211,8 +219,13 @@ body {
 
 /* Animation for typing indicator */
 @keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }
 
 .typing-indicator {
@@ -257,7 +270,8 @@ body {
   box-shadow: 0 0 12px rgba(126, 120, 219, 0.3);
 }
 
-.dark a, .dark button {
+.dark a,
+.dark button {
   color: var(--purple-9);
 }
 
@@ -276,12 +290,12 @@ body {
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #2A2A2A;
+  background: #2a2a2a;
   border-radius: 4px;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #3A3A3A;
+  background: #3a3a3a;
 }
 
 /* Dark mode sidebar enhancements */

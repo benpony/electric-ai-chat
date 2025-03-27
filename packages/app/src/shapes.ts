@@ -1,11 +1,9 @@
-import { Row } from "@electric-sql/client";
-import { useShape, preloadShape } from "@electric-sql/react";
+import { Row } from '@electric-sql/client';
+import { useShape, preloadShape } from '@electric-sql/react';
 
-const ELECTRIC_API_URL = import.meta.env.VITE_ELECTRIC_API_URL || "http://localhost:3000";
+const ELECTRIC_API_URL = import.meta.env.VITE_ELECTRIC_API_URL || 'http://localhost:3000';
 
-type ShapeOptions<T extends Row<unknown> = Row> = Parameters<
-  typeof useShape<T>
->[0]
+type ShapeOptions<T extends Row<unknown> = Row> = Parameters<typeof useShape<T>>[0];
 
 interface MessageRow {
   [key: string]: unknown;
@@ -24,7 +22,7 @@ export function chatsShapeConfig(): ShapeOptions<Chat> {
   return {
     url: `${ELECTRIC_API_URL}/v1/shape`,
     params: {
-      table: "chats",
+      table: 'chats',
     },
     parser: {
       timestamptz: (value: string) => new Date(value),
@@ -34,20 +32,20 @@ export function chatsShapeConfig(): ShapeOptions<Chat> {
 
 export function useChatsShape() {
   return useShape(chatsShapeConfig());
-};
+}
 
 export async function preloadChats() {
   await preloadShape({
     url: `${ELECTRIC_API_URL}/v1/shape`,
     params: {
-      table: "chats",
+      table: 'chats',
     },
   });
 }
 
 export function useChat(chatId: string) {
   const { data: chats } = useChatsShape();
-  return chats.find((chat) => chat.id === chatId);
+  return chats.find(chat => chat.id === chatId);
 }
 
 // Message Shape
@@ -66,7 +64,7 @@ export function messagesShapeConfig(chatId: string): ShapeOptions<Message> {
   return {
     url: `${ELECTRIC_API_URL}/v1/shape`,
     params: {
-      table: "messages",
+      table: 'messages',
       where: `chat_id = '${chatId}'`,
     },
     parser: {
@@ -83,7 +81,7 @@ export async function preloadMessages(chatId: string) {
   await preloadShape({
     url: `${ELECTRIC_API_URL}/v1/shape`,
     params: {
-      table: "messages",
+      table: 'messages',
       where: `chat_id = '${chatId}'`,
     },
   });
@@ -101,7 +99,7 @@ export function tokensShapeConfig(messageId: string): ShapeOptions<Token> {
   return {
     url: `${ELECTRIC_API_URL}/v1/shape`,
     params: {
-      table: "tokens",
+      table: 'tokens',
       where: `message_id = '${messageId}'`,
     },
   };

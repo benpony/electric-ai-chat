@@ -1,17 +1,14 @@
-import { ThemeProvider as NextThemeProvider, useTheme as useNextTheme } from "next-themes";
-import { Theme } from "@radix-ui/themes";
-import { useEffect, useState } from "react";
-import "@radix-ui/themes/styles.css";
+import { ThemeProvider as NextThemeProvider, useTheme as useNextTheme } from 'next-themes';
+import { Theme } from '@radix-ui/themes';
+import { useEffect, useState } from 'react';
+import '@radix-ui/themes/styles.css';
 
 type ThemeProviderProps = {
   children: React.ReactNode;
   defaultTheme?: 'light' | 'dark' | 'system';
 };
 
-export function ThemeProvider({
-  children,
-  defaultTheme = 'system',
-}: ThemeProviderProps) {
+export function ThemeProvider({ children, defaultTheme = 'system' }: ThemeProviderProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -39,4 +36,4 @@ export function ThemeProvider({
 export const useTheme = () => {
   const { theme, setTheme } = useNextTheme();
   return { theme, setTheme };
-}; 
+};

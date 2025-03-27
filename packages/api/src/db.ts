@@ -9,4 +9,4 @@ export const db = process.env.DATABASE_URL
       database: process.env.DB_NAME || 'electric',
       username: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'password',
-    }); 
+    });

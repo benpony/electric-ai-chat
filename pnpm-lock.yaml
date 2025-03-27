@@ -14,6 +14,10 @@ importers:
       react-syntax-highlighter:
         specifier: ^15.6.1
         version: 15.6.1(react@19.0.0)
+    devDependencies:
+      prettier:
+        specifier: ^3.2.4
+        version: 3.5.3
 
   packages/api:
     dependencies:
@@ -39,6 +43,9 @@ importers:
       '@types/node':
         specifier: ^20.10.0
         version: 20.17.27
+      prettier:
+        specifier: ^3.2.4
+        version: 3.5.3
       tsx:
         specifier: ^4.6.0
         version: 4.19.3
@@ -133,6 +140,9 @@ importers:
       eslint-plugin-react-refresh:
         specifier: ^0.4.6
         version: 0.4.19(eslint@8.57.1)
+      prettier:
+        specifier: ^3.2.4
+        version: 3.5.3
       typescript:
         specifier: ^5.2.2
         version: 5.7.3
@@ -2310,6 +2320,11 @@ packages:
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
+
+  prettier@3.5.3:
+    resolution: {integrity: sha512-QQtaxnoDJeAkDvDKWCLiwIXkTgRhwYDEQCghU9Z6q03iyek/rxRh/2lC3HB7P8sWT2xC/y5JDctPLBIGzHKbhw==}
+    engines: {node: '>=14'}
+    hasBin: true
 
   prismjs@1.27.0:
     resolution: {integrity: sha512-t13BGPUlFDR7wRB5kQDG4jjl7XeuH6jbJGt11JHPL96qwsEHNX2+68tFXqc1/k+/jALsbSWJKUOT/hcYAZ5LkA==}
@@ -4920,6 +4935,8 @@ snapshots:
   postgres@3.4.5: {}
 
   prelude-ls@1.2.1: {}
+
+  prettier@3.5.3: {}
 
   prismjs@1.27.0: {}
 

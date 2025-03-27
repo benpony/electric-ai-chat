@@ -1,40 +1,32 @@
-import { useState, useEffect, useRef } from "react";
-import { useParams } from "@tanstack/react-router";
-import {
-  Box,
-  Flex,
-  Text,
-  TextField,
-  IconButton,
-  ScrollArea,
-  Button,
-} from "@radix-ui/themes";
-import { Menu } from "lucide-react";
-import { toggleSidebar } from "./Sidebar";
-import { useChat, useMessagesShape } from "../shapes";
-import { addMessage } from "../api";
-import AiResponse from "./AiResponse";
+import { useState, useEffect, useRef } from 'react';
+import { useParams } from '@tanstack/react-router';
+import { Box, Flex, Text, TextField, IconButton, ScrollArea, Button } from '@radix-ui/themes';
+import { Menu } from 'lucide-react';
+import { toggleSidebar } from './Sidebar';
+import { useChat, useMessagesShape } from '../shapes';
+import { addMessage } from '../api';
+import AiResponse from './AiResponse';
 
 export default function ChatScreen() {
-  const { chatId } = useParams({ from: "/chat/$chatId" });
+  const { chatId } = useParams({ from: '/chat/$chatId' });
   const chat = useChat(chatId);
   const { data: messages } = useMessagesShape(chatId);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const scrollContentRef = useRef<HTMLDivElement>(null);
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
-  const username = localStorage.getItem("username") || "User";
+  const username = localStorage.getItem('username') || 'User';
 
   // Define CSS variables for theming that will adapt to dark mode
   const themeVariables = {
-    "--color-background-message": "var(--gray-3)",
-    "--shadow-message": "0 1px 1px rgba(0, 0, 0, 0.04)",
-    "@media (prefers-color-scheme: dark)": {
-      "--color-background-message": "var(--gray-5)",
-      "--shadow-message": "0 1px 1px rgba(0, 0, 0, 0.2)",
+    '--color-background-message': 'var(--gray-3)',
+    '--shadow-message': '0 1px 1px rgba(0, 0, 0, 0.04)',
+    '@media (prefers-color-scheme: dark)': {
+      '--color-background-message': 'var(--gray-5)',
+      '--shadow-message': '0 1px 1px rgba(0, 0, 0, 0.2)',
     },
   };
 
@@ -44,8 +36,8 @@ export default function ChatScreen() {
       setIsMobile(window.innerWidth < 768);
     };
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Check if user is scrolled to bottom
@@ -60,9 +52,8 @@ export default function ChatScreen() {
 
     const scrollAreaElement = scrollAreaRef.current;
     if (scrollAreaElement) {
-      scrollAreaElement.addEventListener("scroll", handleScroll);
-      return () =>
-        scrollAreaElement.removeEventListener("scroll", handleScroll);
+      scrollAreaElement.addEventListener('scroll', handleScroll);
+      return () => scrollAreaElement.removeEventListener('scroll', handleScroll);
     }
   }, []);
 
@@ -73,18 +64,18 @@ export default function ChatScreen() {
     // Function to scroll to bottom if needed
     const scrollToBottomIfNeeded = () => {
       if (shouldScrollToBottom && messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
       }
     };
 
     // Create mutation observer
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(mutations => {
       // Check if there were meaningful changes that should trigger a scroll
       const hasContentChanges = mutations.some(
-        (mutation) =>
-          mutation.type === "childList" ||
-          mutation.type === "characterData" ||
-          (mutation.type === "attributes" && mutation.attributeName === "style")
+        mutation =>
+          mutation.type === 'childList' ||
+          mutation.type === 'characterData' ||
+          (mutation.type === 'attributes' && mutation.attributeName === 'style')
       );
 
       if (hasContentChanges) {
@@ -107,7 +98,7 @@ export default function ChatScreen() {
   useEffect(() => {
     // Scroll to bottom on initial load and when messages change, if shouldScrollToBottom is true
     if (shouldScrollToBottom && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, shouldScrollToBottom]);
 
@@ -123,12 +114,12 @@ export default function ChatScreen() {
       await addMessage(chatId, message.trim(), username);
 
       // Clear input
-      setMessage("");
+      setMessage('');
 
       // Force scroll to bottom when user sends a message
       setShouldScrollToBottom(true);
     } catch (error) {
-      console.error("Failed to send message:", error);
+      console.error('Failed to send message:', error);
       // Could add error handling/display here
     } finally {
       setIsLoading(false);
@@ -137,7 +128,7 @@ export default function ChatScreen() {
 
   if (!chat) {
     return (
-      <Flex align="center" justify="center" style={{ height: "100%" }}>
+      <Flex align="center" justify="center" style={{ height: '100%' }}>
         <Text color="gray" size="2">
           Not found
         </Text>
@@ -146,18 +137,15 @@ export default function ChatScreen() {
   }
 
   return (
-    <Flex
-      direction="column"
-      style={{ height: "100%", width: "100%", ...themeVariables }}
-    >
+    <Flex direction="column" style={{ height: '100%', width: '100%', ...themeVariables }}>
       {/* Header with title and sidebar toggle */}
       <Flex
         align="center"
         justify="between"
         style={{
-          height: "56px",
-          borderBottom: "1px solid var(--gray-5)",
-          padding: "0 16px",
+          height: '56px',
+          borderBottom: '1px solid var(--gray-5)',
+          padding: '0 16px',
           flexShrink: 0,
         }}
       >
@@ -174,48 +162,39 @@ export default function ChatScreen() {
       </Flex>
 
       {/* Messages - Scrollable */}
-      <ScrollArea
-        style={{ height: "100%" }}
-        scrollbars="vertical"
-        ref={scrollAreaRef}
-      >
+      <ScrollArea style={{ height: '100%' }} scrollbars="vertical" ref={scrollAreaRef}>
         <Box
           p="3"
-          style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
           ref={scrollContentRef}
         >
           {messages
             .sort((a, b) => a.created_at.getTime() - b.created_at.getTime())
-            .map((msg) => (
+            .map(msg => (
               <Flex
                 key={msg.id}
                 justify={
-                  msg.role === "agent"
-                    ? "center"
-                    : msg.user_name === username
-                    ? "end"
-                    : "start"
+                  msg.role === 'agent' ? 'center' : msg.user_name === username ? 'end' : 'start'
                 }
               >
-                {msg.role === "agent" ? (
+                {msg.role === 'agent' ? (
                   <AiResponse message={msg} />
                 ) : (
                   <Flex
                     direction="column"
                     style={{
-                      maxWidth: "60%",
-                      marginBottom: "10px",
-                      alignItems:
-                        msg.user_name === username ? "flex-end" : "flex-start",
+                      maxWidth: '60%',
+                      marginBottom: '10px',
+                      alignItems: msg.user_name === username ? 'flex-end' : 'flex-start',
                     }}
                   >
                     {msg.user_name !== username && (
                       <Text
                         size="1"
                         style={{
-                          color: "var(--gray-11)",
-                          marginLeft: "4px",
-                          marginBottom: "3px",
+                          color: 'var(--gray-11)',
+                          marginLeft: '4px',
+                          marginBottom: '3px',
                         }}
                       >
                         {msg.user_name}
@@ -225,20 +204,17 @@ export default function ChatScreen() {
                       style={{
                         backgroundColor:
                           msg.user_name === username
-                            ? "var(--accent-9)"
-                            : "var(--color-background-message)",
-                        color:
-                          msg.user_name === username
-                            ? "white"
-                            : "var(--gray-12)",
-                        padding: "8px 12px",
-                        borderRadius: "18px",
-                        position: "relative",
-                        maxWidth: "fit-content",
-                        boxShadow: "var(--shadow-message)",
+                            ? 'var(--accent-9)'
+                            : 'var(--color-background-message)',
+                        color: msg.user_name === username ? 'white' : 'var(--gray-12)',
+                        padding: '8px 12px',
+                        borderRadius: '18px',
+                        position: 'relative',
+                        maxWidth: 'fit-content',
+                        boxShadow: 'var(--shadow-message)',
                       }}
                     >
-                      <Text size="2" style={{ whiteSpace: "pre-wrap" }}>
+                      <Text size="2" style={{ whiteSpace: 'pre-wrap' }}>
                         {msg.content}
                       </Text>
                     </Box>
@@ -264,9 +240,9 @@ export default function ChatScreen() {
       {/* Message Input - Fixed */}
       <Box
         style={{
-          borderTop: "1px solid var(--border-color)",
+          borderTop: '1px solid var(--border-color)',
           flexShrink: 0,
-          padding: "16px",
+          padding: '16px',
         }}
       >
         <form onSubmit={handleSubmit}>
@@ -276,16 +252,10 @@ export default function ChatScreen() {
                 size="3"
                 placeholder="Type a message..."
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={e => setMessage(e.target.value)}
                 disabled={isLoading}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    !e.shiftKey &&
-                    !e.altKey &&
-                    !e.ctrlKey &&
-                    !e.metaKey
-                  ) {
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
                     e.preventDefault();
                     if (message.trim() && !isLoading) {
                       handleSubmit(e);
@@ -294,11 +264,7 @@ export default function ChatScreen() {
                 }}
               />
             </Box>
-            <Button
-              type="submit"
-              size="3"
-              disabled={!message.trim() || isLoading}
-            >
+            <Button type="submit" size="3" disabled={!message.trim() || isLoading}>
               Send
             </Button>
           </Flex>

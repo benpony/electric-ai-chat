@@ -14,6 +14,7 @@ This is the API server for Electric Chat.
 1. Make sure you have Node.js and Postgres installed.
 
 2. Install dependencies:
+
    ```
    npm install
    ```
@@ -32,11 +33,13 @@ This is the API server for Electric Chat.
 ## Running the API
 
 Development mode:
+
 ```
 npm run dev
 ```
 
 Production mode:
+
 ```
 npm run build
 npm start
@@ -47,9 +50,10 @@ The server will start on http://localhost:3001 by default.
 ## API Endpoints
 
 - `POST /api/chats` - Create a new chat
+
   - Request body: `{ "message": "Hello", "user": "John" }`
   - Response: `{ "chat": { "id": 1, "created_at": "2023-06-15T10:30:00Z", "messages": [...] } }`
 
 - `POST /api/chats/:id/messages` - Add a message to a chat
   - Request body: `{ "message": "Hello back", "user": "Jane" }`
-  - Response: `{ "message": { "id": 2, "content": "Hello back", "user_name": "Jane", "created_at": "2023-06-15T10:35:00Z" } }` 
+  - Response: `{ "message": { "id": 2, "content": "Hello back", "user_name": "Jane", "created_at": "2023-06-15T10:35:00Z" } }`

@@ -1,14 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import {
-  Box,
-  Flex,
-  Text,
-  Heading,
-  Button,
-  IconButton,
-  Tooltip,
-} from '@radix-ui/themes';
+import { Box, Flex, Text, Heading, Button, IconButton, Tooltip } from '@radix-ui/themes';
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme } from './theme-provider';
 
@@ -21,12 +13,12 @@ export default function WelcomeScreen() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!username.trim()) {
       setError('Please enter your name');
       return;
     }
-    
+
     setIsSubmitting(true);
     localStorage.setItem('username', username);
     window.dispatchEvent(new Event('storage'));
@@ -34,52 +26,59 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <Flex 
-      direction="column" 
-      style={{ 
+    <Flex
+      direction="column"
+      style={{
         height: '100vh',
         width: '100vw',
-        position: 'relative'
+        position: 'relative',
       }}
     >
       {/* Theme Toggle */}
       <Box style={{ position: 'absolute', top: '16px', right: '16px' }}>
-        <Tooltip content={theme === "dark" ? "Light mode" : theme === "light" ? "System mode" : "Dark mode"}>
+        <Tooltip
+          content={
+            theme === 'dark' ? 'Light mode' : theme === 'light' ? 'System mode' : 'Dark mode'
+          }
+        >
           <IconButton
             size="1"
             variant="ghost"
             onClick={() => {
-              if (theme === "dark") setTheme("light");
-              else if (theme === "light") setTheme("system");
-              else setTheme("dark");
+              if (theme === 'dark') setTheme('light');
+              else if (theme === 'light') setTheme('system');
+              else setTheme('dark');
             }}
           >
-            {theme === "dark" ? <Sun size={14} /> : theme === "light" ? <Monitor size={14} /> : <Moon size={14} />}
+            {theme === 'dark' ? (
+              <Sun size={14} />
+            ) : theme === 'light' ? (
+              <Monitor size={14} />
+            ) : (
+              <Moon size={14} />
+            )}
           </IconButton>
         </Tooltip>
       </Box>
 
       {/* Main Content */}
-      <Flex 
-        direction="column" 
-        align="center" 
-        justify="center" 
-        style={{ 
+      <Flex
+        direction="column"
+        align="center"
+        justify="center"
+        style={{
           flex: 1,
-          padding: '16px'
+          padding: '16px',
         }}
       >
-        <Box style={{ 
-          maxWidth: '480px', 
-          width: '100%',
-          padding: '0 16px'
-        }}>
-          <Heading 
-            size="6" 
-            mb="5"
-            align="center"
-            weight="medium"
-          >
+        <Box
+          style={{
+            maxWidth: '480px',
+            width: '100%',
+            padding: '0 16px',
+          }}
+        >
+          <Heading size="6" mb="5" align="center" weight="medium">
             Welcome to Electric Chat
           </Heading>
 
@@ -103,15 +102,15 @@ export default function WelcomeScreen() {
                 }}
                 disabled={isSubmitting}
               />
-              
+
               {error && (
                 <Text color="red" size="2" align="center">
                   {error}
                 </Text>
               )}
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 size="3"
                 disabled={isSubmitting}
                 style={{
@@ -126,4 +125,4 @@ export default function WelcomeScreen() {
       </Flex>
     </Flex>
   );
-} 
+}
