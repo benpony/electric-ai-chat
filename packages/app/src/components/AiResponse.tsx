@@ -1,8 +1,15 @@
 import { Flex, Text, Box } from "@radix-ui/themes";
 import { Message, useTokensShape } from "../shapes";
 import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useTheme } from "./theme-provider";
 
 function MarkdownMessage({ content }: { content: string }) {
+  const { theme } = useTheme();
+  const syntaxTheme = theme === "dark" ? vscDarkPlus : oneLight;
+
   return (
     <Box
       px="6"
@@ -29,8 +36,6 @@ function MarkdownMessage({ content }: { content: string }) {
               pre: ({ children, ...props }) => (
                 <pre
                   style={{
-                    backgroundColor: "var(--gray-3)",
-                    padding: "1em",
                     borderRadius: "5px",
                     overflow: "auto",
                     margin: "1em 0",
@@ -41,7 +46,10 @@ function MarkdownMessage({ content }: { content: string }) {
                 </pre>
               ),
               code: ({ children, className, ...props }) => {
+                const match = /language-(\w+)/.exec(className || "");
+                const language = match ? match[1] : "";
                 const isInline = !className;
+
                 return isInline ? (
                   <code
                     style={{
@@ -56,14 +64,17 @@ function MarkdownMessage({ content }: { content: string }) {
                     {children}
                   </code>
                 ) : (
-                  <code
-                    style={{
-                      fontFamily: "monospace",
+                  <SyntaxHighlighter
+                    style={syntaxTheme}
+                    language={language}
+                    PreTag="div"
+                    customStyle={{
+                      borderRadius: "5px",
+                      margin: "0",
                     }}
-                    {...props}
                   >
-                    {children}
-                  </code>
+                    {String(children).replace(/\n$/, "")}
+                  </SyntaxHighlighter>
                 );
               },
               a: ({ children, ...props }) => (
@@ -80,12 +91,18 @@ function MarkdownMessage({ content }: { content: string }) {
                 </a>
               ),
               h1: ({ children, ...props }) => (
-                <h1 style={{ margin: "0.67em 0", fontSize: "1.5em" }} {...props}>
+                <h1
+                  style={{ margin: "0.67em 0", fontSize: "1.5em" }}
+                  {...props}
+                >
                   {children}
                 </h1>
               ),
               h2: ({ children, ...props }) => (
-                <h2 style={{ margin: "0.83em 0", fontSize: "1.3em" }} {...props}>
+                <h2
+                  style={{ margin: "0.83em 0", fontSize: "1.3em" }}
+                  {...props}
+                >
                   {children}
                 </h2>
               ),
@@ -131,7 +148,7 @@ function CompletedMessage({ message }: { message: Message }) {
 function PendingMessage({ message }: { message: Message }) {
   const { data: tokens } = useTokensShape(message.id);
   const tokenText = tokens?.map((token) => token.token_text).join("");
-  
+
   return <MarkdownMessage content={tokenText || ""} />;
 }
 
