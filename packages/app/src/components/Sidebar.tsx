@@ -114,6 +114,7 @@ export default function Sidebar() {
             height: '56px',
             borderBottom: '1px solid var(--gray-5)',
             position: 'relative',
+            flexShrink: 0,
           }}
         >
           <Text size="3" weight="medium" style={{ paddingLeft: '4px' }}>

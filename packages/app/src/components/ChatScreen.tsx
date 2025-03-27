@@ -165,7 +165,7 @@ export default function ChatScreen() {
       <ScrollArea style={{ height: '100%' }} scrollbars="vertical" ref={scrollAreaRef}>
         <Box
           p="3"
-          style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+          style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '100%' }}
           ref={scrollContentRef}
         >
           {messages

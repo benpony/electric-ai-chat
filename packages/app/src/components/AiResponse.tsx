@@ -1,4 +1,4 @@
-import { Flex, Text, Box } from '@radix-ui/themes';
+import { Flex, Text, Box, ScrollArea } from '@radix-ui/themes';
 import { Message, useTokensShape } from '../shapes';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -14,8 +14,7 @@ function MarkdownMessage({ content }: { content: string }) {
     <Box
       px="6"
       style={{
-        maxWidth: '800px',
-        width: '100%',
+        width: 'min(100%, 800px)',
       }}
     >
       <Flex justify="start">
@@ -68,10 +67,7 @@ function MarkdownMessage({ content }: { content: string }) {
                     style={syntaxTheme}
                     language={language}
                     PreTag="div"
-                    customStyle={{
-                      borderRadius: '5px',
-                      margin: '0',
-                    }}
+                    className="syntax-highlighter"
                   >
                     {String(children).replace(/\n$/, '')}
                   </SyntaxHighlighter>
