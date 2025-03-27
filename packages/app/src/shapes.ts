@@ -1,5 +1,6 @@
 import { Row } from '@electric-sql/client';
 import { useShape, preloadShape } from '@electric-sql/react';
+import { useEffect, useMemo, useRef } from 'react';
 
 const ELECTRIC_API_URL = import.meta.env.VITE_ELECTRIC_API_URL || 'http://localhost:3000';
 
@@ -95,16 +96,37 @@ export interface Token extends MessageRow {
   token_text: string;
 }
 
-export function tokensShapeConfig(messageId: string): ShapeOptions<Token> {
+export function tokensShapeConfig(
+  messageId: string,
+  abortController: AbortController
+): ShapeOptions<Token> {
   return {
     url: `${ELECTRIC_API_URL}/v1/shape`,
     params: {
       table: 'tokens',
       where: `message_id = '${messageId}'`,
     },
+    signal: abortController.signal,
   };
 }
 
 export function useTokensShape(messageId: string) {
-  return useShape(tokensShapeConfig(messageId));
+  const abortController = useMemo(() => new AbortController(), [messageId]);
+  const timeouts = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+  if (timeouts.current[messageId]) {
+    clearTimeout(timeouts.current[messageId]);
+  }
+  useEffect(() => {
+    return () => {
+      console.log('unmounting', timeouts.current[messageId]);
+      if (timeouts.current[messageId]) {
+        clearTimeout(timeouts.current[messageId]);
+      }
+      timeouts.current[messageId] = setTimeout(() => {
+        abortController.abort();
+        delete timeouts.current[messageId];
+      }, 100);
+    };
+  }, [messageId]);
+  return useShape(tokensShapeConfig(messageId, abortController));
 }

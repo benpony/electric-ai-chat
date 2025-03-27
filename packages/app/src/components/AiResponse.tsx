@@ -1,4 +1,4 @@
-import { Flex, Text, Box, ScrollArea } from '@radix-ui/themes';
+import { Flex, Text, Box } from '@radix-ui/themes';
 import { Message, useTokensShape } from '../shapes';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
