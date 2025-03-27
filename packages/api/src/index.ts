@@ -66,6 +66,33 @@ app.use('/*', cors({
   credentials: true,
 }));
 
+// Helper function to create a concise chat name using OpenAI
+async function generateChatName(message: string) {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'Create a short, concise name (maximum 50 characters) that summarizes the following message. Return only the name, no quotes or explanation.'
+        },
+        {
+          role: 'user',
+          content: message
+        }
+      ],
+      max_tokens: 50,
+    });
+    
+    // Extract and return the generated name
+    const generatedName = completion.choices[0]?.message.content?.trim() || '';
+    return generatedName.slice(0, 50); // Ensure name is not too long
+  } catch (err) {
+    console.error('Error generating chat name:', err);
+    return null; // Return null if generation failed
+  }
+}
+
 // Helper function to create AI response
 async function createAIResponse(chatId: string, contextRows: any[]) {
   try {
@@ -228,10 +255,29 @@ app.post('/api/chats', async (c: Context) => {
       
       return { ...newChat, messages: [rowToChatMessage(newMessage)] } as Chat;
     });
-
+    
     if (!ENABLE_AI) {
       return c.json({ chat }, 201);
     }
+
+    // Asynchronously generate a better name for the chat and update it
+    // This happens after we've already responded to the client
+    generateChatName(message).then(async (generatedName) => {
+      if (generatedName) {
+        try {
+          await db`
+            UPDATE chats
+            SET name = ${generatedName}
+            WHERE id = ${chatId}
+          `;
+          console.log(`Updated chat ${chatId} name to: ${generatedName}`);
+        } catch (updateErr) {
+          console.error('Error updating chat name:', updateErr);
+        }
+      }
+    }).catch(err => {
+      console.error('Error in chat name generation process:', err);
+    });
     
     // Trigger AI response
     const messages = await db`
