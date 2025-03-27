@@ -170,39 +170,39 @@ export default function Sidebar() {
         )}
 
         {/* Chats */}
-        <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-          <Box p="4">
-            <Text size="1" color="gray" mb="1" style={{ fontWeight: "medium" }}>
-              RECENT CHATS
-            </Text>
-            <Flex direction="column" gap="1" style={{ paddingTop: "4px" }}>
+        <ScrollArea>
+          <div className="sidebar-content">
+            <Flex direction="column" gap="1" px="4">
+              <Box py="2">
+                <Text size="1" color="gray" weight="medium">
+                  RECENT CHATS
+                </Text>
+              </Box>
               {chats.sort((a, b) => b.created_at.getTime() - a.created_at.getTime()).map((chat) => {
                 const chatPath = `/chat/${chat.id}`;
                 const isActive = currentPath === chatPath;
-
                 return (
                   <Button
                     key={chat.id}
                     variant="ghost"
                     color="gray"
                     size="1"
-                    
+                    my="1"
                     style={{
                       justifyContent: "flex-start",
                       height: "22px",
                       backgroundColor: isActive ? "var(--gray-5)" : undefined,
-                      marginTop: "0",
-                      marginBottom: "-2px",
+                      overflow: "hidden",
                     }}
                     onClick={() => handleChatClick(chat.id)}
                   >
                     <Text
                       size="1"
                       style={{
+                        maxWidth: "100%",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        // fontWeight: isActive ? "bold" : "normal",
+                        whiteSpace: "nowrap"
                       }}
                     >
                       {chat.name}
@@ -211,7 +211,7 @@ export default function Sidebar() {
                 );
               })}
             </Flex>
-          </Box>
+          </div>
         </ScrollArea>
 
         {/* Footer */}
