@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { db } from './db.js';
 import { rowToChatMessage } from './utils.js';
 import { Chat, CreateChatRequest, CreateMessageRequest } from './types.js';
-import { createAIResponse, generateChatName, ENABLE_AI } from './ai.js';
+import { createAIResponse, generateChatName, ENABLE_AI } from './ai/index.js';
 
 const app = new Hono();
 
@@ -102,7 +102,7 @@ app.post('/api/chats', async (c: Context) => {
     // Asynchronously generate a better name for the chat and update it
     // This happens after we've already responded to the client
     generateChatName(message)
-      .then(async generatedName => {
+      .then(async (generatedName: string | null) => {
         if (generatedName) {
           try {
             await db`
@@ -116,7 +116,7 @@ app.post('/api/chats', async (c: Context) => {
           }
         }
       })
-      .catch(err => {
+      .catch((err: Error) => {
         console.error('Error in chat name generation process:', err);
       });
 

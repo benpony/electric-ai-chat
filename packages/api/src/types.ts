@@ -1,10 +1,11 @@
 export interface ChatMessage {
   id: string;
+  chat_id: string;
   content: string;
   user_name: string;
+  role: 'user' | 'agent';
+  status: 'pending' | 'completed' | 'failed' | 'aborted';
   created_at: Date;
-  role?: 'user' | 'agent';
-  status?: 'pending' | 'completed' | 'failed';
 }
 
 export interface ToolCall {

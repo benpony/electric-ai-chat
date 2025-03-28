@@ -4,239 +4,24 @@ import type {
   ChatCompletionSystemMessageParam,
   ChatCompletionUserMessageParam,
   ChatCompletionAssistantMessageParam,
-  ChatCompletionTool,
 } from 'openai/resources/chat/completions';
 import { Shape, ShapeStream } from '@electric-sql/client';
 import { randomUUID } from 'crypto';
-import { db } from './db.js';
-import { ChatMessage, ToolCall } from './types.js';
-import { rowToChatMessage } from './utils.js';
-import { systemPrompt } from './system-prompt.js';
+import { db } from '../db.js';
+import { ChatMessage, ToolCall } from '../types.js';
+import { rowToChatMessage } from '../utils.js';
+import { systemPrompt } from '../system-prompt.js';
+import { basicTools, renameChat, renameChatTo, pinChat, generateChatName } from './tools/basic.js';
+import { electricTools, electricChats, fetchElectricDocs } from './tools/electric.js';
+import { processStreamChunks } from './stream.js';
 
+export { generateChatName };
 export const ENABLE_AI = true;
 const ELECTRIC_API_URL = process.env.ELECTRIC_API_URL || 'http://localhost:3000';
-const ELECTRIC_DOCS_URL = 'https://electric-sql.com/llms.txt';
-
-// Cache for ElectricSQL documentation
-let electricDocsCache: string | null = null;
-let lastFetchTime: number = 0;
-const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
-
-// Track if a chat has started discussing ElectricSQL
-// If the chat has started discussing ElectricSQL, we will continue to provide the full
-// llms.txt documentation to the AI as a system message on each prompt.
-const electricChats = new Set<string>();
-
-async function fetchElectricDocs(): Promise<string> {
-  const now = Date.now();
-  if (electricDocsCache && now - lastFetchTime < CACHE_DURATION) {
-    return electricDocsCache;
-  }
-
-  try {
-    const response = await fetch(ELECTRIC_DOCS_URL);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ElectricSQL docs: ${response.statusText}`);
-    }
-    electricDocsCache = await response.text();
-    lastFetchTime = now;
-    return electricDocsCache;
-  } catch (error) {
-    console.error('Error fetching ElectricSQL docs:', error);
-    return ''; // Return empty string on error
-  }
-}
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_KEY,
 });
-
-// Helper function to create a concise chat name using OpenAI
-export async function generateChatName(message: string) {
-  try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Create a short, concise human readable name (maximum 50 characters) that summarizes the following message. Return only the name, no quotes or explanation. It will be used in the UI as the chat name.',
-        },
-        {
-          role: 'user',
-          content: message,
-        },
-      ],
-      max_tokens: 50,
-    });
-
-    // Extract and return the generated name
-    const generatedName = completion.choices[0]?.message.content?.trim() || '';
-    return generatedName.slice(0, 50); // Ensure name is not too long
-  } catch (err) {
-    console.error('Error generating chat name:', err);
-    return null; // Return null if generation failed
-  }
-}
-
-// Chat name generator tool
-export async function renameChat(chatId: string, context: string): Promise<string> {
-  try {
-    const newName = await generateChatName(context);
-    if (newName) {
-      await db`
-        UPDATE chats
-        SET name = ${newName}
-        WHERE id = ${chatId}
-      `;
-      return newName;
-    }
-    return '';
-  } catch (err) {
-    console.error('Error renaming chat:', err);
-    return '';
-  }
-}
-
-// Chat rename tool
-export async function renameChatTo(chatId: string, name: string): Promise<string> {
-  try {
-    // Limit name to 50 characters
-    const truncatedName = name.slice(0, 50);
-    await db`
-      UPDATE chats
-      SET name = ${truncatedName}
-      WHERE id = ${chatId}
-    `;
-    return truncatedName;
-  } catch (err) {
-    console.error('Error renaming chat:', err);
-    return '';
-  }
-}
-
-// Pin/Unpin chat tool
-export async function pinChat(chatId: string, pinned: boolean): Promise<boolean> {
-  try {
-    await db`
-      UPDATE chats
-      SET pinned = ${pinned}
-      WHERE id = ${chatId}
-    `;
-    return true;
-  } catch (err) {
-    console.error('Error pinning/unpinning chat:', err);
-    return false;
-  }
-}
-
-// Define tools once at the top level
-const tools: ChatCompletionTool[] = [
-  {
-    type: 'function' as const,
-    function: {
-      name: 'fetch_electric_docs',
-      description:
-        'Fetch the latest ElectricSQL documentation to help answer questions about ElectricSQL features, best practices, and solutions',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'The specific query or topic to look up in the documentation',
-          },
-        },
-        required: ['query'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'rename_chat',
-      description: 'Rename the current chat session based on its content',
-      parameters: {
-        type: 'object',
-        properties: {
-          context: {
-            type: 'string',
-            description: 'A summary of the chat context to use for generating the new name',
-          },
-        },
-        required: ['context'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'rename_chat_to',
-      description: 'Rename the current chat session to a specific name provided by the user',
-      parameters: {
-        type: 'object',
-        properties: {
-          name: {
-            type: 'string',
-            description: 'The exact name to rename the chat to',
-          },
-        },
-        required: ['name'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'pin_chat',
-      description: 'Pin the current chat to keep it at the top of the sidebar',
-      parameters: {
-        type: 'object',
-        properties: {
-          pinned: {
-            type: 'boolean',
-            description: 'Whether to pin (true) or unpin (false) the chat',
-          },
-        },
-        required: ['pinned'],
-      },
-    },
-  },
-];
-
-// Helper function to process stream chunks
-async function processStreamChunks(
-  stream: AsyncIterable<any>,
-  messageId: string,
-  tokenNumber: number,
-  tokenBuffer: string,
-  lastInsertTime: number
-): Promise<{
-  fullContent: string;
-  tokenNumber: number;
-  tokenBuffer: string;
-  lastInsertTime: number;
-}> {
-  let fullContent = '';
-  for await (const chunk of stream) {
-    const content = chunk.choices[0]?.delta?.content || '';
-    if (content) {
-      fullContent += content;
-      tokenBuffer += content;
-
-      const currentTime = Date.now();
-      if (currentTime - lastInsertTime >= 60 || tokenBuffer.length > 100) {
-        await db`
-          INSERT INTO tokens (message_id, token_number, token_text)
-          VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
-        `;
-        tokenNumber++;
-        tokenBuffer = '';
-        lastInsertTime = currentTime;
-      }
-    }
-  }
-  return { fullContent, tokenNumber, tokenBuffer, lastInsertTime };
-}
 
 // Helper function to create AI response
 export async function createAIResponse(chatId: string, contextRows: any[]) {
@@ -359,6 +144,9 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
   let toolCalls: ToolCall[] = [];
   let tokenBuffer = '';
   let lastInsertTime = Date.now();
+
+  // Combine all tools
+  const tools = [...basicTools, ...electricTools];
 
   // Call OpenAI with streaming
   const streamPromise = openai.chat.completions.create({
