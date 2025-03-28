@@ -11,12 +11,10 @@ import { Shape, ShapeStream } from '@electric-sql/client';
 const ENABLE_AI = true;
 const ELECTRIC_API_URL = process.env.ELECTRIC_API_URL || 'http://localhost:3000';
 
-// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_KEY,
 });
 
-// Define types
 interface ChatMessage {
   id: string;
   content: string;
@@ -24,6 +22,24 @@ interface ChatMessage {
   created_at: Date;
   role?: 'user' | 'agent';
   status?: 'pending' | 'completed' | 'failed';
+}
+
+interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+interface ToolResponse {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    content: string;
+  };
 }
 
 interface Chat {
@@ -44,7 +60,6 @@ interface CreateMessageRequest {
   user: string;
 }
 
-// Helper to convert database rows to ChatMessage objects
 function rowToChatMessage(row: any): ChatMessage {
   return {
     id: row.id,
@@ -96,6 +111,42 @@ async function generateChatName(message: string) {
   } catch (err) {
     console.error('Error generating chat name:', err);
     return null; // Return null if generation failed
+  }
+}
+
+// Chat name generator tool
+async function renameChat(chatId: string, context: string): Promise<string> {
+  try {
+    const newName = await generateChatName(context);
+    if (newName) {
+      await db`
+        UPDATE chats
+        SET name = ${newName}
+        WHERE id = ${chatId}
+      `;
+      return newName;
+    }
+    return '';
+  } catch (err) {
+    console.error('Error renaming chat:', err);
+    return '';
+  }
+}
+
+// Chat rename tool
+async function renameChatTo(chatId: string, name: string): Promise<string> {
+  try {
+    // Limit name to 50 characters
+    const truncatedName = name.slice(0, 50);
+    await db`
+      UPDATE chats
+      SET name = ${truncatedName}
+      WHERE id = ${chatId}
+    `;
+    return truncatedName;
+  } catch (err) {
+    console.error('Error renaming chat:', err);
+    return '';
   }
 }
 
@@ -185,6 +236,43 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
     model: 'gpt-4o',
     messages,
     stream: true,
+    tools: [
+      {
+        type: 'function',
+        function: {
+          name: 'rename_chat',
+          description: 'Rename the current chat session based on its content',
+          parameters: {
+            type: 'object',
+            properties: {
+              context: {
+                type: 'string',
+                description: 'A summary of the chat context to use for generating the new name',
+              },
+            },
+            required: ['context'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'rename_chat_to',
+          description: 'Rename the current chat session to a specific name provided by the user',
+          parameters: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'The exact name to rename the chat to',
+              },
+            },
+            required: ['name'],
+          },
+        },
+      },
+    ],
+    tool_choice: 'auto',
   });
   abortController.signal.addEventListener('abort', async () => {
     (await streamPromise).controller.abort();
@@ -193,6 +281,7 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
 
   let tokenNumber = 0;
   let fullContent = '';
+  let toolCalls: ToolCall[] = [];
 
   // Process each chunk as it arrives
   let tokenBuffer = '';
@@ -200,6 +289,26 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
 
   for await (const chunk of stream) {
     const content = chunk.choices[0]?.delta?.content || '';
+    const toolCall = chunk.choices[0]?.delta?.tool_calls?.[0];
+
+    if (toolCall) {
+      if (toolCall.id) {
+        toolCalls.push({
+          id: toolCall.id,
+          type: 'function',
+          function: {
+            name: toolCall.function?.name || '',
+            arguments: toolCall.function?.arguments || '',
+          },
+        });
+      } else if (toolCall.function?.arguments) {
+        const lastCall = toolCalls[toolCalls.length - 1];
+        if (lastCall) {
+          lastCall.function.arguments += toolCall.function.arguments;
+        }
+      }
+    }
+
     if (content) {
       fullContent += content;
       tokenBuffer += content;
@@ -216,6 +325,27 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
         tokenBuffer = '';
         lastInsertTime = currentTime;
       }
+    }
+  }
+
+  // Process any tool calls
+  for (const toolCall of toolCalls) {
+    try {
+      const args = JSON.parse(toolCall.function.arguments);
+
+      if (toolCall.function.name === 'rename_chat') {
+        const newName = await renameChat(chatId, args.context);
+        if (newName) {
+          fullContent += `\n\nI've renamed this chat to: "${newName}"`;
+        }
+      } else if (toolCall.function.name === 'rename_chat_to') {
+        const newName = await renameChatTo(chatId, args.name);
+        if (newName) {
+          fullContent += `\n\nI've renamed this chat to: "${newName}"`;
+        }
+      }
+    } catch (err) {
+      console.error('Error processing tool call:', err);
     }
   }
 
@@ -321,10 +451,10 @@ app.post('/api/chats', async (c: Context) => {
         if (generatedName) {
           try {
             await db`
-            UPDATE chats
-            SET name = ${generatedName}
-            WHERE id = ${chatId}
-          `;
+              UPDATE chats
+              SET name = ${generatedName}
+              WHERE id = ${chatId}
+            `;
             console.log(`Updated chat ${chatId} name to: ${generatedName}`);
           } catch (updateErr) {
             console.error('Error updating chat name:', updateErr);
