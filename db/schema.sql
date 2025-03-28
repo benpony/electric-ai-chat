@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS chats (
     id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    name TEXT
+    name TEXT,
+    pinned BOOLEAN DEFAULT FALSE
 );
 
 CREATE TYPE message_status AS ENUM ('pending', 'completed', 'failed', 'aborted');

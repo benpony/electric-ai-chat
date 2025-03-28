@@ -9,4 +9,4 @@ export function rowToChatMessage(row: any): ChatMessage {
     role: row.role,
     status: row.status,
   };
-} 
+}

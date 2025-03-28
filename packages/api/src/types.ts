@@ -41,4 +41,4 @@ export interface CreateChatRequest {
 export interface CreateMessageRequest {
   message: string;
   user: string;
-} 
+}

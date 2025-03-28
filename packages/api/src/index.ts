@@ -246,6 +246,40 @@ app.post('/api/messages/:id/abort', async (c: Context) => {
   }
 });
 
+// Pin/Unpin a chat
+app.post('/api/chats/:id/pin', async (c: Context) => {
+  const chatId = c.req.param('id');
+  const body = await c.req.json();
+  const { pinned } = body as { pinned: boolean };
+
+  if (typeof pinned !== 'boolean') {
+    return c.json({ error: 'pinned must be a boolean' }, 400);
+  }
+
+  try {
+    // Verify chat exists
+    const [chat] = await db`
+      SELECT id FROM chats WHERE id = ${chatId}
+    `;
+
+    if (!chat) {
+      return c.json({ error: 'Chat not found' }, 404);
+    }
+
+    // Update chat pinned status
+    await db`
+      UPDATE chats
+      SET pinned = ${pinned}
+      WHERE id = ${chatId}
+    `;
+
+    return c.json({ success: true });
+  } catch (err) {
+    console.error('Error updating chat pin status:', err);
+    return c.json({ error: 'Failed to update chat pin status' }, 500);
+  }
+});
+
 // Start server
 const port = parseInt(process.env.PORT || '3001', 10);
 console.log(`Server is running on http://localhost:${port}`);

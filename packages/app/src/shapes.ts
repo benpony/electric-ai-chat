@@ -17,6 +17,7 @@ export interface Chat extends MessageRow {
   name: string;
   created_at: Date;
   updated_at: Date;
+  pinned: boolean;
 }
 
 export function chatsShapeConfig(): ShapeOptions<Chat> {

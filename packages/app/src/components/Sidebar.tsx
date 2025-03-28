@@ -10,7 +10,7 @@ import {
   Tooltip,
   Separator,
 } from '@radix-ui/themes';
-import { LogOut, Moon, Sun, MessageSquarePlus, Monitor } from 'lucide-react';
+import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin, PinOff } from 'lucide-react';
 import { useTheme } from './theme-provider';
 import { useChatsShape } from '../shapes';
 
@@ -86,6 +86,19 @@ export default function Sidebar() {
       setSidebarOpenState(false);
     }
   };
+
+  // Sort and separate chats into pinned and unpinned
+  const sortedChats = chats.sort((a, b) => {
+    // First sort by pinned status
+    if (a.pinned !== b.pinned) {
+      return b.pinned ? 1 : -1;
+    }
+    // Then by creation date
+    return b.created_at.getTime() - a.created_at.getTime();
+  });
+
+  const pinnedChats = sortedChats.filter(chat => chat.pinned);
+  const unpinnedChats = sortedChats.filter(chat => !chat.pinned);
 
   return (
     <>
@@ -168,45 +181,90 @@ export default function Sidebar() {
         <ScrollArea>
           <div className="sidebar-content">
             <Flex direction="column" gap="1" px="4">
+              {/* Pinned Chats Section */}
+              {pinnedChats.length > 0 && (
+                <>
+                  <Box py="2">
+                    <Text size="1" color="gray" weight="medium">
+                      PINNED CHATS
+                    </Text>
+                  </Box>
+                  {pinnedChats.map(chat => {
+                    const chatPath = `/chat/${chat.id}`;
+                    const isActive = currentPath === chatPath;
+                    return (
+                      <Button
+                        key={chat.id}
+                        variant="ghost"
+                        color="gray"
+                        size="1"
+                        my="1"
+                        style={{
+                          justifyContent: 'flex-start',
+                          height: '22px',
+                          backgroundColor: isActive ? 'var(--gray-5)' : undefined,
+                          overflow: 'hidden',
+                        }}
+                        onClick={() => handleChatClick(chat.id)}
+                      >
+                        <Pin size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
+                        <Text
+                          size="1"
+                          style={{
+                            maxWidth: '100%',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {chat.name}
+                        </Text>
+                      </Button>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Recent Chats Header */}
               <Box py="2">
                 <Text size="1" color="gray" weight="medium">
                   RECENT CHATS
                 </Text>
               </Box>
-              {chats
-                .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
-                .map(chat => {
-                  const chatPath = `/chat/${chat.id}`;
-                  const isActive = currentPath === chatPath;
-                  return (
-                    <Button
-                      key={chat.id}
-                      variant="ghost"
-                      color="gray"
+
+              {/* Unpinned Chats */}
+              {unpinnedChats.map(chat => {
+                const chatPath = `/chat/${chat.id}`;
+                const isActive = currentPath === chatPath;
+                return (
+                  <Button
+                    key={chat.id}
+                    variant="ghost"
+                    color="gray"
+                    size="1"
+                    my="1"
+                    style={{
+                      justifyContent: 'flex-start',
+                      height: '22px',
+                      backgroundColor: isActive ? 'var(--gray-5)' : undefined,
+                      overflow: 'hidden',
+                    }}
+                    onClick={() => handleChatClick(chat.id)}
+                  >
+                    <Text
                       size="1"
-                      my="1"
                       style={{
-                        justifyContent: 'flex-start',
-                        height: '22px',
-                        backgroundColor: isActive ? 'var(--gray-5)' : undefined,
+                        maxWidth: '100%',
                         overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
-                      onClick={() => handleChatClick(chat.id)}
                     >
-                      <Text
-                        size="1"
-                        style={{
-                          maxWidth: '100%',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {chat.name}
-                      </Text>
-                    </Button>
-                  );
-                })}
+                      {chat.name}
+                    </Text>
+                  </Button>
+                );
+              })}
             </Flex>
           </div>
         </ScrollArea>

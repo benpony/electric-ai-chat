@@ -77,6 +77,21 @@ export async function renameChatTo(chatId: string, name: string): Promise<string
   }
 }
 
+// Pin/Unpin chat tool
+export async function pinChat(chatId: string, pinned: boolean): Promise<boolean> {
+  try {
+    await db`
+      UPDATE chats
+      SET pinned = ${pinned}
+      WHERE id = ${chatId}
+    `;
+    return true;
+  } catch (err) {
+    console.error('Error pinning/unpinning chat:', err);
+    return false;
+  }
+}
+
 // Helper function to create AI response
 export async function createAIResponse(chatId: string, contextRows: any[]) {
   try {
@@ -198,6 +213,23 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
           },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'pin_chat',
+          description: 'Pin the current chat to keep it at the top of the sidebar',
+          parameters: {
+            type: 'object',
+            properties: {
+              pinned: {
+                type: 'boolean',
+                description: 'Whether to pin (true) or unpin (false) the chat',
+              },
+            },
+            required: ['pinned'],
+          },
+        },
+      },
     ],
     tool_choice: 'auto',
   });
@@ -270,6 +302,11 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
         if (newName) {
           fullContent += `\n\nI've renamed this chat to: "${newName}"`;
         }
+      } else if (toolCall.function.name === 'pin_chat') {
+        const success = await pinChat(chatId, args.pinned);
+        if (success) {
+          fullContent += `\n\nI've ${args.pinned ? 'pinned' : 'unpinned'} this chat.`;
+        }
       }
     } catch (err) {
       console.error('Error processing tool call:', err);
@@ -293,4 +330,4 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
 
   // Abort the message stream
   abortController.abort();
-} 
+}
