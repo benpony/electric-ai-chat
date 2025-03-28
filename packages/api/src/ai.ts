@@ -1,13 +1,51 @@
 import OpenAI from 'openai';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionSystemMessageParam,
+  ChatCompletionUserMessageParam,
+  ChatCompletionAssistantMessageParam,
+  ChatCompletionTool,
+} from 'openai/resources/chat/completions';
 import { Shape, ShapeStream } from '@electric-sql/client';
 import { randomUUID } from 'crypto';
 import { db } from './db.js';
 import { ChatMessage, ToolCall } from './types.js';
 import { rowToChatMessage } from './utils.js';
+import { systemPrompt } from './system-prompt.js';
 
 export const ENABLE_AI = true;
 const ELECTRIC_API_URL = process.env.ELECTRIC_API_URL || 'http://localhost:3000';
+const ELECTRIC_DOCS_URL = 'https://electric-sql.com/llms.txt';
+
+// Cache for ElectricSQL documentation
+let electricDocsCache: string | null = null;
+let lastFetchTime: number = 0;
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+// Track if a chat has started discussing ElectricSQL
+// If the chat has started discussing ElectricSQL, we will continue to provide the full
+// llms.txt documentation to the AI as a system message on each prompt.
+const electricChats = new Set<string>();
+
+async function fetchElectricDocs(): Promise<string> {
+  const now = Date.now();
+  if (electricDocsCache && now - lastFetchTime < CACHE_DURATION) {
+    return electricDocsCache;
+  }
+
+  try {
+    const response = await fetch(ELECTRIC_DOCS_URL);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ElectricSQL docs: ${response.statusText}`);
+    }
+    electricDocsCache = await response.text();
+    lastFetchTime = now;
+    return electricDocsCache;
+  } catch (error) {
+    console.error('Error fetching ElectricSQL docs:', error);
+    return ''; // Return empty string on error
+  }
+}
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_KEY,
@@ -92,6 +130,114 @@ export async function pinChat(chatId: string, pinned: boolean): Promise<boolean>
   }
 }
 
+// Define tools once at the top level
+const tools: ChatCompletionTool[] = [
+  {
+    type: 'function' as const,
+    function: {
+      name: 'fetch_electric_docs',
+      description:
+        'Fetch the latest ElectricSQL documentation to help answer questions about ElectricSQL features, best practices, and solutions',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The specific query or topic to look up in the documentation',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'rename_chat',
+      description: 'Rename the current chat session based on its content',
+      parameters: {
+        type: 'object',
+        properties: {
+          context: {
+            type: 'string',
+            description: 'A summary of the chat context to use for generating the new name',
+          },
+        },
+        required: ['context'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'rename_chat_to',
+      description: 'Rename the current chat session to a specific name provided by the user',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'The exact name to rename the chat to',
+          },
+        },
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'pin_chat',
+      description: 'Pin the current chat to keep it at the top of the sidebar',
+      parameters: {
+        type: 'object',
+        properties: {
+          pinned: {
+            type: 'boolean',
+            description: 'Whether to pin (true) or unpin (false) the chat',
+          },
+        },
+        required: ['pinned'],
+      },
+    },
+  },
+];
+
+// Helper function to process stream chunks
+async function processStreamChunks(
+  stream: AsyncIterable<any>,
+  messageId: string,
+  tokenNumber: number,
+  tokenBuffer: string,
+  lastInsertTime: number
+): Promise<{
+  fullContent: string;
+  tokenNumber: number;
+  tokenBuffer: string;
+  lastInsertTime: number;
+}> {
+  let fullContent = '';
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || '';
+    if (content) {
+      fullContent += content;
+      tokenBuffer += content;
+
+      const currentTime = Date.now();
+      if (currentTime - lastInsertTime >= 60 || tokenBuffer.length > 100) {
+        await db`
+          INSERT INTO tokens (message_id, token_number, token_text)
+          VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
+        `;
+        tokenNumber++;
+        tokenBuffer = '';
+        lastInsertTime = currentTime;
+      }
+    }
+  }
+  return { fullContent, tokenNumber, tokenBuffer, lastInsertTime };
+}
+
 // Helper function to create AI response
 export async function createAIResponse(chatId: string, contextRows: any[]) {
   try {
@@ -167,85 +313,68 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
     }
   });
 
+  // Check if this is an ElectricSQL-related question
+  const isElectricQuestion = context.some(
+    msg =>
+      msg.role === 'user' &&
+      (msg.content.toLowerCase().includes('electric') ||
+        msg.content.toLowerCase().includes('electric-sql') ||
+        msg.content.toLowerCase().includes('electric sql'))
+  );
+
+  // If it's an ElectricSQL question, mark this chat as an ElectricSQL chat
+  if (isElectricQuestion) {
+    electricChats.add(chatId);
+  }
+
   // Convert chat history to OpenAI format
-  const messages: ChatCompletionMessageParam[] = context.map(msg => ({
-    role: msg.role === 'agent' ? 'assistant' : 'user',
-    content: msg.content,
-  }));
+  const messages: ChatCompletionMessageParam[] = [
+    systemPrompt,
+    ...context.map(
+      msg =>
+        ({
+          role: msg.role === 'agent' ? 'assistant' : ('user' as const),
+          content: msg.content,
+        }) as ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam
+    ),
+    {
+      role: 'assistant',
+      content: '',
+    },
+  ];
+
+  // If this is an ElectricSQL chat, add the full documentation
+  if (electricChats.has(chatId)) {
+    const docs = await fetchElectricDocs();
+    if (docs) {
+      messages.push({
+        role: 'system',
+        content: `Here's the complete ElectricSQL documentation:\n${docs}`,
+      } as ChatCompletionSystemMessageParam);
+    }
+  }
+
+  let tokenNumber = 0;
+  let fullContent = '';
+  let toolCalls: ToolCall[] = [];
+  let tokenBuffer = '';
+  let lastInsertTime = Date.now();
 
   // Call OpenAI with streaming
   const streamPromise = openai.chat.completions.create({
     model: 'gpt-4o',
     messages,
     stream: true,
-    tools: [
-      {
-        type: 'function',
-        function: {
-          name: 'rename_chat',
-          description: 'Rename the current chat session based on its content',
-          parameters: {
-            type: 'object',
-            properties: {
-              context: {
-                type: 'string',
-                description: 'A summary of the chat context to use for generating the new name',
-              },
-            },
-            required: ['context'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'rename_chat_to',
-          description: 'Rename the current chat session to a specific name provided by the user',
-          parameters: {
-            type: 'object',
-            properties: {
-              name: {
-                type: 'string',
-                description: 'The exact name to rename the chat to',
-              },
-            },
-            required: ['name'],
-          },
-        },
-      },
-      {
-        type: 'function',
-        function: {
-          name: 'pin_chat',
-          description: 'Pin the current chat to keep it at the top of the sidebar',
-          parameters: {
-            type: 'object',
-            properties: {
-              pinned: {
-                type: 'boolean',
-                description: 'Whether to pin (true) or unpin (false) the chat',
-              },
-            },
-            required: ['pinned'],
-          },
-        },
-      },
-    ],
+    tools,
     tool_choice: 'auto',
   });
+
   abortController.signal.addEventListener('abort', async () => {
     (await streamPromise).controller.abort();
   });
   const stream = await streamPromise;
 
-  let tokenNumber = 0;
-  let fullContent = '';
-  let toolCalls: ToolCall[] = [];
-
   // Process each chunk as it arrives
-  let tokenBuffer = '';
-  let lastInsertTime = 0;
-
   for await (const chunk of stream) {
     const content = chunk.choices[0]?.delta?.content || '';
     const toolCall = chunk.choices[0]?.delta?.tool_calls?.[0];
@@ -274,12 +403,10 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
 
       const currentTime = Date.now();
       if (currentTime - lastInsertTime >= 60 || tokenBuffer.length > 100) {
-        // Store token batch in the tokens table
         await db`
           INSERT INTO tokens (message_id, token_number, token_text)
           VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
         `;
-
         tokenNumber++;
         tokenBuffer = '';
         lastInsertTime = currentTime;
@@ -292,7 +419,42 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
     try {
       const args = JSON.parse(toolCall.function.arguments);
 
-      if (toolCall.function.name === 'rename_chat') {
+      if (toolCall.function.name === 'fetch_electric_docs') {
+        console.log('fetch_electric_docs', args);
+        // Add the chatId to the set of ElectricSQL chats
+        electricChats.add(chatId);
+        const docs = await fetchElectricDocs();
+        if (docs) {
+          // Add the docs as a system message and continue the conversation
+          messages.push({
+            role: 'system',
+            content: `Here's the relevant ElectricSQL documentation for "${args.query}":\n${docs}`,
+          } as ChatCompletionSystemMessageParam);
+
+          // Get a new completion with the updated context
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages,
+            stream: true,
+            tools,
+            tool_choice: 'auto',
+          });
+
+          // Process the new stream
+          const result = await processStreamChunks(
+            completion,
+            messageId,
+            tokenNumber,
+            tokenBuffer,
+            lastInsertTime
+          );
+          fullContent += result.fullContent;
+          tokenNumber = result.tokenNumber;
+          tokenBuffer = result.tokenBuffer;
+          lastInsertTime = result.lastInsertTime;
+          continue; // Skip the rest of the tool calls since we've handled this one
+        }
+      } else if (toolCall.function.name === 'rename_chat') {
         const newName = await renameChat(chatId, args.context);
         if (newName) {
           fullContent += `\n\nI've renamed this chat to: "${newName}"`;

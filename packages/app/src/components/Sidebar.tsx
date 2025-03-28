@@ -10,7 +10,7 @@ import {
   Tooltip,
   Separator,
 } from '@radix-ui/themes';
-import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin, PinOff } from 'lucide-react';
+import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin } from 'lucide-react';
 import { useTheme } from './theme-provider';
 import { useChatsShape } from '../shapes';
 
