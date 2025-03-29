@@ -264,12 +264,12 @@ export default function Sidebar() {
           </Box>
         )}
 
-        {/* Files Section for Active Chat */}
-        {currentChatId && <FileList chatId={currentChatId} />}
-
         {/* Chats */}
         <ScrollArea>
           <div className="sidebar-content">
+            {/* Files Section for Active Chat */}
+            {currentChatId && <FileList chatId={currentChatId} />}
+
             <Flex direction="column" gap="1" px="4">
               {/* Pinned Chats Section */}
               {pinnedChats.length > 0 && (

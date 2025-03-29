@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { useParams } from '@tanstack/react-router';
 import { Box, Flex, Text, TextField, IconButton, ScrollArea, Button } from '@radix-ui/themes';
 import { Menu } from 'lucide-react';
@@ -7,11 +7,163 @@ import { useChat, useMessagesShape } from '../shapes';
 import { addMessage } from '../api';
 import AiResponse from './AiResponse';
 
+type Message = {
+  id: string;
+  content: string;
+  role: string;
+  user_name: string;
+  created_at: Date;
+  chat_id: string;
+  status: string;
+};
+
+interface MessageListProps {
+  messages: Message[];
+  username: string;
+  scrollAreaRef: React.RefObject<HTMLDivElement>;
+  scrollContentRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+}
+
+interface MessageInputProps {
+  onSubmit: (message: string) => void;
+  isLoading: boolean;
+}
+
+// MessageList component to display messages
+const MessageList = memo(
+  ({ messages, username, scrollAreaRef, scrollContentRef, messagesEndRef }: MessageListProps) => {
+    return (
+      <ScrollArea style={{ height: '100%' }} scrollbars="vertical" ref={scrollAreaRef}>
+        <Box
+          p="3"
+          style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '100%' }}
+          ref={scrollContentRef}
+        >
+          {messages
+            .sort((a, b) => a.created_at.getTime() - b.created_at.getTime())
+            .map(msg => (
+              <Flex
+                key={msg.id}
+                justify={
+                  msg.role === 'agent' ? 'center' : msg.user_name === username ? 'end' : 'start'
+                }
+              >
+                {msg.role === 'agent' ? (
+                  <AiResponse message={msg} />
+                ) : (
+                  <Flex
+                    direction="column"
+                    style={{
+                      maxWidth: '60%',
+                      marginBottom: '10px',
+                      alignItems: msg.user_name === username ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    {msg.user_name !== username && (
+                      <Text
+                        size="1"
+                        style={{
+                          color: 'var(--gray-11)',
+                          marginLeft: '4px',
+                          marginBottom: '3px',
+                        }}
+                      >
+                        {msg.user_name}
+                      </Text>
+                    )}
+                    <Box
+                      style={{
+                        backgroundColor:
+                          msg.user_name === username
+                            ? 'var(--accent-9)'
+                            : 'var(--color-background-message)',
+                        color: msg.user_name === username ? 'white' : 'var(--gray-12)',
+                        padding: '8px 12px',
+                        borderRadius: '18px',
+                        position: 'relative',
+                        maxWidth: 'fit-content',
+                        boxShadow: 'var(--shadow-message)',
+                      }}
+                    >
+                      <Text size="2" style={{ whiteSpace: 'pre-wrap' }}>
+                        {msg.content}
+                      </Text>
+                    </Box>
+                  </Flex>
+                )}
+              </Flex>
+            ))}
+
+          {/* {isLoading && (
+            <Flex justify="center">
+              <Box className="typing-indicator">
+                <Box className="typing-dot" />
+                <Box className="typing-dot" />
+                <Box className="typing-dot" />
+              </Box>
+            </Flex>
+          )} */}
+
+          <div ref={messagesEndRef} />
+        </Box>
+      </ScrollArea>
+    );
+  }
+);
+
+// MessageInput component for the form
+const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
+  const [message, setMessage] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim() || isLoading) return;
+
+    onSubmit(message.trim());
+    setMessage('');
+  };
+
+  return (
+    <Box
+      style={{
+        borderTop: '1px solid var(--border-color)',
+        flexShrink: 0,
+        padding: '16px',
+      }}
+    >
+      <form onSubmit={handleSubmit}>
+        <Flex gap="2">
+          <Box style={{ flex: 1 }}>
+            <TextField.Root
+              size="3"
+              placeholder="Type a message..."
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              disabled={isLoading}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                  e.preventDefault();
+                  if (message.trim() && !isLoading) {
+                    handleSubmit(e);
+                  }
+                }
+              }}
+            />
+          </Box>
+          <Button type="submit" size="3" disabled={!message.trim() || isLoading}>
+            Send
+          </Button>
+        </Flex>
+      </form>
+    </Box>
+  );
+});
+
 export default function ChatScreen() {
   const { chatId } = useParams({ from: '/chat/$chatId' });
   const chat = useChat(chatId);
   const { data: messages } = useMessagesShape(chatId);
-  const [message, setMessage] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -25,7 +177,7 @@ export default function ChatScreen() {
   const themeVariables = {
     '--color-background-message': 'var(--gray-3)',
     '--shadow-message': '0 1px 1px rgba(0, 0, 0, 0.04)',
-    '@media (prefers-color-scheme: dark)': {
+    '@media (prefersColorScheme: dark)': {
       '--color-background-message': 'var(--gray-5)',
       '--shadow-message': '0 1px 1px rgba(0, 0, 0, 0.2)',
     },
@@ -103,19 +255,12 @@ export default function ChatScreen() {
     }
   }, [messages, shouldScrollToBottom]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!message.trim()) return;
-
+  const handleMessageSubmit = async (messageText: string) => {
     try {
       setIsLoading(true);
 
       // Send message to API
-      await addMessage(chatId, message.trim(), username);
-
-      // Clear input
-      setMessage('');
+      await addMessage(chatId, messageText, username);
 
       // Force scroll to bottom when user sends a message
       setShouldScrollToBottom(true);
@@ -163,114 +308,16 @@ export default function ChatScreen() {
       </Flex>
 
       {/* Messages - Scrollable */}
-      <ScrollArea style={{ height: '100%' }} scrollbars="vertical" ref={scrollAreaRef}>
-        <Box
-          p="3"
-          style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '100%' }}
-          ref={scrollContentRef}
-        >
-          {messages
-            .sort((a, b) => a.created_at.getTime() - b.created_at.getTime())
-            .map(msg => (
-              <Flex
-                key={msg.id}
-                justify={
-                  msg.role === 'agent' ? 'center' : msg.user_name === username ? 'end' : 'start'
-                }
-              >
-                {msg.role === 'agent' ? (
-                  <AiResponse message={msg} />
-                ) : (
-                  <Flex
-                    direction="column"
-                    style={{
-                      maxWidth: '60%',
-                      marginBottom: '10px',
-                      alignItems: msg.user_name === username ? 'flex-end' : 'flex-start',
-                    }}
-                  >
-                    {msg.user_name !== username && (
-                      <Text
-                        size="1"
-                        style={{
-                          color: 'var(--gray-11)',
-                          marginLeft: '4px',
-                          marginBottom: '3px',
-                        }}
-                      >
-                        {msg.user_name}
-                      </Text>
-                    )}
-                    <Box
-                      style={{
-                        backgroundColor:
-                          msg.user_name === username
-                            ? 'var(--accent-9)'
-                            : 'var(--color-background-message)',
-                        color: msg.user_name === username ? 'white' : 'var(--gray-12)',
-                        padding: '8px 12px',
-                        borderRadius: '18px',
-                        position: 'relative',
-                        maxWidth: 'fit-content',
-                        boxShadow: 'var(--shadow-message)',
-                      }}
-                    >
-                      <Text size="2" style={{ whiteSpace: 'pre-wrap' }}>
-                        {msg.content}
-                      </Text>
-                    </Box>
-                  </Flex>
-                )}
-              </Flex>
-            ))}
-
-          {/* {isLoading && (
-              <Flex justify="center">
-                <Box className="typing-indicator">
-                  <Box className="typing-dot" />
-                  <Box className="typing-dot" />
-                  <Box className="typing-dot" />
-                </Box>
-              </Flex>
-            )} */}
-
-          <div ref={messagesEndRef} />
-        </Box>
-      </ScrollArea>
+      <MessageList
+        messages={messages}
+        username={username}
+        scrollAreaRef={scrollAreaRef}
+        scrollContentRef={scrollContentRef}
+        messagesEndRef={messagesEndRef}
+      />
 
       {/* Message Input - Fixed */}
-      <Box
-        style={{
-          borderTop: '1px solid var(--border-color)',
-          flexShrink: 0,
-          padding: '16px',
-        }}
-      >
-        <form onSubmit={handleSubmit}>
-          <Flex gap="2">
-            <Box style={{ flex: 1 }}>
-              <TextField.Root
-                size="3"
-                placeholder="Type a message..."
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                disabled={isLoading}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
-                    e.preventDefault();
-                    if (message.trim() && !isLoading) {
-                      handleSubmit(e);
-                    }
-                  }
-                }}
-              />
-            </Box>
-            <Button type="submit" size="3" disabled={!message.trim() || isLoading}>
-              Send
-            </Button>
-          </Flex>
-        </form>
-      </Box>
+      <MessageInput onSubmit={handleMessageSubmit} isLoading={isLoading} />
     </Flex>
   );
 }
