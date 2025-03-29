@@ -15,30 +15,55 @@ export function useShapeWithAbort<T extends Row<unknown>>(
   timeout: number
 ) {
   const key = JSON.stringify(rawShapeConfig);
-  const abortController = useMemo(() => new AbortController(), [key]);
-  const timeouts = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+  const storeRef = useRef<{
+    controllers: Record<string, AbortController>;
+    mounts: Record<string, number>;
+    timeouts: Record<string, ReturnType<typeof setTimeout>>;
+  }>({
+    controllers: {},
+    mounts: {},
+    timeouts: {},
+  });
+  const store = storeRef.current;
+
+  if (!store.controllers[key]) {
+    store.controllers[key] = new AbortController();
+  }
+
   const shapeConfig = useMemo(
     () => ({
       ...rawShapeConfig,
-      signal: abortController.signal,
+      signal: store.controllers[key].signal,
     }),
-    [key, abortController]
+    [rawShapeConfig, store.controllers[key]]
   );
-  if (timeouts.current[key]) {
-    clearTimeout(timeouts.current[key]);
-  }
+
   useEffect(() => {
+    // Increment mount count
+    store.mounts[key] = (store.mounts[key] || 0) + 1;
+
+    // Clear any pending timeout
+    if (store.timeouts[key]) {
+      clearTimeout(store.timeouts[key]);
+      delete store.timeouts[key];
+    }
+
     return () => {
-      console.log('unmounting', timeouts.current[key]);
-      if (timeouts.current[key]) {
-        clearTimeout(timeouts.current[key]);
+      // Decrement mount count
+      store.mounts[key] = Math.max(0, (store.mounts[key] || 0) - 1);
+
+      // If fully unmounted, set abort timeout
+      if (store.mounts[key] === 0) {
+        store.timeouts[key] = setTimeout(() => {
+          // Abort current controller and create new one
+          store.controllers[key].abort();
+          store.controllers[key] = new AbortController();
+          delete store.timeouts[key];
+        }, timeout);
       }
-      timeouts.current[key] = setTimeout(() => {
-        abortController.abort();
-        delete timeouts.current[key];
-      }, timeout);
     };
-  }, [key]);
+  }, [key, timeout, store]);
+
   return useShape(shapeConfig);
 }
 
