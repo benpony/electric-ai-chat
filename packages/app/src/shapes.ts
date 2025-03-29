@@ -10,6 +10,38 @@ interface MessageRow {
   [key: string]: unknown;
 }
 
+export function useShapeWithAbort<T extends Row<unknown>>(
+  rawShapeConfig: ShapeOptions<T>,
+  timeout: number
+) {
+  const key = JSON.stringify(rawShapeConfig);
+  const abortController = useMemo(() => new AbortController(), [key]);
+  const timeouts = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+  const shapeConfig = useMemo(
+    () => ({
+      ...rawShapeConfig,
+      signal: abortController.signal,
+    }),
+    [key, abortController]
+  );
+  if (timeouts.current[key]) {
+    clearTimeout(timeouts.current[key]);
+  }
+  useEffect(() => {
+    return () => {
+      console.log('unmounting', timeouts.current[key]);
+      if (timeouts.current[key]) {
+        clearTimeout(timeouts.current[key]);
+      }
+      timeouts.current[key] = setTimeout(() => {
+        abortController.abort();
+        delete timeouts.current[key];
+      }, timeout);
+    };
+  }, [key]);
+  return useShape(shapeConfig);
+}
+
 // Chat Shape
 
 export interface Chat extends MessageRow {
@@ -29,6 +61,7 @@ export function chatsShapeConfig(): ShapeOptions<Chat> {
     parser: {
       timestamptz: (value: string) => new Date(value),
     },
+    signal: new AbortController().signal, // Dummy signal to ensure hashing is consistent
   };
 }
 
@@ -37,12 +70,7 @@ export function useChatsShape() {
 }
 
 export async function preloadChats() {
-  await preloadShape({
-    url: `${ELECTRIC_API_URL}/v1/shape`,
-    params: {
-      table: 'chats',
-    },
-  });
+  await preloadShape<Chat>(chatsShapeConfig());
 }
 
 export function useChat(chatId: string) {
@@ -72,21 +100,16 @@ export function messagesShapeConfig(chatId: string): ShapeOptions<Message> {
     parser: {
       timestamptz: (value: string) => new Date(value),
     },
+    signal: new AbortController().signal, // Dummy signal to ensure hashing is consistent
   };
 }
 
 export function useMessagesShape(chatId: string) {
-  return useShape(messagesShapeConfig(chatId));
+  return useShapeWithAbort(messagesShapeConfig(chatId), 1000);
 }
 
 export async function preloadMessages(chatId: string) {
-  await preloadShape({
-    url: `${ELECTRIC_API_URL}/v1/shape`,
-    params: {
-      table: 'messages',
-      where: `chat_id = '${chatId}'`,
-    },
-  });
+  await preloadShape<Message>(messagesShapeConfig(chatId));
 }
 
 // Token Shape
@@ -97,39 +120,19 @@ export interface Token extends MessageRow {
   token_text: string;
 }
 
-export function tokensShapeConfig(
-  messageId: string,
-  abortController: AbortController
-): ShapeOptions<Token> {
+export function tokensShapeConfig(messageId: string): ShapeOptions<Token> {
   return {
     url: `${ELECTRIC_API_URL}/v1/shape`,
     params: {
       table: 'tokens',
       where: `message_id = '${messageId}'`,
     },
-    signal: abortController.signal,
+    signal: new AbortController().signal, // Dummy signal to ensure hashing is consistent
   };
 }
 
 export function useTokensShape(messageId: string) {
-  const abortController = useMemo(() => new AbortController(), [messageId]);
-  const timeouts = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
-  if (timeouts.current[messageId]) {
-    clearTimeout(timeouts.current[messageId]);
-  }
-  useEffect(() => {
-    return () => {
-      console.log('unmounting', timeouts.current[messageId]);
-      if (timeouts.current[messageId]) {
-        clearTimeout(timeouts.current[messageId]);
-      }
-      timeouts.current[messageId] = setTimeout(() => {
-        abortController.abort();
-        delete timeouts.current[messageId];
-      }, 100);
-    };
-  }, [messageId]);
-  return useShape(tokensShapeConfig(messageId, abortController));
+  return useShapeWithAbort(tokensShapeConfig(messageId), 1000);
 }
 
 // File Shape
@@ -154,19 +157,14 @@ export function filesShapeConfig(chatId: string): ShapeOptions<File> {
     parser: {
       timestamptz: (value: string) => new Date(value),
     },
+    signal: new AbortController().signal, // Dummy signal to ensure hashing is consistent
   };
 }
 
 export function useFilesShape(chatId: string) {
-  return useShape(filesShapeConfig(chatId));
+  return useShapeWithAbort(filesShapeConfig(chatId), 1000);
 }
 
 export async function preloadFiles(chatId: string) {
-  await preloadShape({
-    url: `${ELECTRIC_API_URL}/v1/shape`,
-    params: {
-      table: 'files',
-      where: `chat_id = '${chatId}'`,
-    },
-  });
+  await preloadShape<File>(filesShapeConfig(chatId));
 }
