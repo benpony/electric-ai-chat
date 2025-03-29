@@ -262,6 +262,8 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
       try {
         const args = JSON.parse(toolCall.function.arguments);
 
+        console.log('toolCall', toolCall);
+
         if (toolCall.function.name === 'fetch_electric_docs') {
           console.log('fetch_electric_docs', args);
           // Add the chatId to the set of ElectricSQL chats
@@ -300,54 +302,73 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
           }
         } else if (toolCall.function.name === 'create_file') {
           const result = await createFile(chatId, args.path, args.mime_type, args.content);
-          if (result.success) {
-            fullContent += `\n\nI've created the file "${args.path}"`;
-          } else {
-            fullContent += `\n\nFailed to create file "${args.path}": ${result.error}`;
-          }
+          const response = result.success 
+            ? `\n\nI've created the file "${args.path}"`
+            : `\n\nFailed to create file "${args.path}": ${result.error}`;
+          fullContent += response;
+          tokenBuffer += response;
         } else if (toolCall.function.name === 'edit_file') {
           const result = await editFile(chatId, args.path, args.content);
-          if (result.success) {
-            fullContent += `\n\nI've updated the file "${args.path}"`;
-          } else {
-            fullContent += `\n\nFailed to update file "${args.path}": ${result.error}`;
-          }
+          const response = result.success
+            ? `\n\nI've updated the file "${args.path}"`
+            : `\n\nFailed to update file "${args.path}": ${result.error}`;
+          fullContent += response;
+          tokenBuffer += response;
         } else if (toolCall.function.name === 'delete_file') {
           const result = await deleteFile(chatId, args.path);
-          if (result.success) {
-            fullContent += `\n\nI've deleted the file "${args.path}"`;
-          } else {
-            fullContent += `\n\nFailed to delete file "${args.path}": ${result.error}`;
-          }
+          const response = result.success
+            ? `\n\nI've deleted the file "${args.path}"`
+            : `\n\nFailed to delete file "${args.path}": ${result.error}`;
+          fullContent += response;
+          tokenBuffer += response;
         } else if (toolCall.function.name === 'rename_file') {
           const result = await renameFile(chatId, args.old_path, args.new_path);
-          if (result.success) {
-            fullContent += `\n\nI've renamed "${args.old_path}" to "${args.new_path}"`;
-          } else {
-            fullContent += `\n\nFailed to rename file: ${result.error}`;
-          }
+          const response = result.success
+            ? `\n\nI've renamed "${args.old_path}" to "${args.new_path}"`
+            : `\n\nFailed to rename file: ${result.error}`;
+          fullContent += response;
+          tokenBuffer += response;
         } else if (toolCall.function.name === 'read_file') {
           const result = await readFile(chatId, args.path);
-          if (result.success && result.file) {
-            fullContent += `\n\nHere's the contents of "${args.path}":\n\`\`\`\n${result.file.content}\n\`\`\``;
-          } else {
-            fullContent += `\n\nFailed to read file "${args.path}": ${result.error}`;
-          }
+          const response = result.success && result.file
+            ? `\n\nHere's the contents of "${args.path}":\n\`\`\`\n${result.file.content}\n\`\`\``
+            : `\n\nFailed to read file "${args.path}": ${result.error}`;
+          fullContent += response;
+          tokenBuffer += response;
         } else if (toolCall.function.name === 'rename_chat') {
           const newName = await renameChat(chatId, args.context);
           if (newName) {
-            fullContent += `\n\nI've renamed this chat to: "${newName}"`;
+            const response = `\n\nI've renamed this chat to: "${newName}"`;
+            fullContent += response;
+            tokenBuffer += response;
           }
         } else if (toolCall.function.name === 'rename_chat_to') {
           const newName = await renameChatTo(chatId, args.name);
           if (newName) {
-            fullContent += `\n\nI've renamed this chat to: "${newName}"`;
+            const response = `\n\nI've renamed this chat to: "${newName}"`;
+            fullContent += response;
+            tokenBuffer += response;
           }
         } else if (toolCall.function.name === 'pin_chat') {
           const success = await pinChat(chatId, args.pinned);
           if (success) {
-            fullContent += `\n\nI've ${args.pinned ? 'pinned' : 'unpinned'} this chat.`;
+            const response = `\n\nI've ${args.pinned ? 'pinned' : 'unpinned'} this chat.`;
+            fullContent += response;
+            tokenBuffer += response;
           }
+        }
+
+        // Insert tokens if buffer is full or enough time has passed
+        const currentTime = Date.now();
+        if (currentTime - lastInsertTime >= 60 || tokenBuffer.length > 0) {
+          console.log('inserting tokens (1)', tokenBuffer);
+          await db`
+            INSERT INTO tokens (message_id, token_number, token_text)
+            VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
+          `;
+          tokenNumber++;
+          tokenBuffer = '';
+          lastInsertTime = currentTime;
         }
       } catch (err) {
         console.error('Error processing tool call:', err);
