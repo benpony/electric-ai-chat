@@ -6,7 +6,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme } from './theme-provider';
 import { abortMessage } from '../api';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader, OctagonX } from 'lucide-react';
 
 function MarkdownMessage({ content }: { content: string }) {
@@ -144,6 +144,24 @@ function PendingMessage({ message }: { message: Message }) {
   const { data: tokens } = useTokensShape(message.id);
   const tokenText = tokens?.map(token => token.token_text).join('');
   const [isAborting, setIsAborting] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
+  const [, forceUpdate] = useState({});
+
+  // Update lastUpdateTime when new tokens arrive
+  useEffect(() => {
+    if (tokenText) {
+      setLastUpdateTime(Date.now());
+    }
+  }, [tokenText]);
+
+  // Set up timeout to trigger re-render when updates are stale
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      forceUpdate({});
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [lastUpdateTime]);
 
   const handleAbort = async () => {
     try {
@@ -156,9 +174,24 @@ function PendingMessage({ message }: { message: Message }) {
     }
   };
 
+  const showThinking = !tokenText || Date.now() - lastUpdateTime > 500;
+
   return (
     <Box position="relative" width="100%">
       <MarkdownMessage content={tokenText || ''} />
+      {showThinking && (
+        <Box px="6" style={{ marginTop: '0.5em' }}>
+          <Text
+            color="gray"
+            size="2"
+            style={{
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }}
+          >
+            Thinking...
+          </Text>
+        </Box>
+      )}
       <Box position="absolute" top="0" right="6" style={{ zIndex: 100, top: '-10px' }}>
         <Tooltip content="Stop generating">
           <IconButton
@@ -181,6 +214,15 @@ function PendingMessage({ message }: { message: Message }) {
           </IconButton>
         </Tooltip>
       </Box>
+      <style>
+        {`
+          @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+          }
+        `}
+      </style>
     </Box>
   );
 }
