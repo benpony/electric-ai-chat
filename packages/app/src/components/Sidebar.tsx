@@ -11,39 +11,167 @@ import {
   Separator,
 } from '@radix-ui/themes';
 import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin } from 'lucide-react';
-import { useTheme } from './theme-provider';
+import { useTheme } from './ThemeProvider';
 import { useChatsShape } from '../shapes';
 import { FileList } from './FileList';
+import { useSidebar } from './SidebarProvider';
 
-// Create a global variable to track sidebar state
-let isSidebarOpen = false;
-let setSidebarOpen: (value: boolean) => void;
+// Chat Button Component
+type ChatButtonProps = {
+  chat: {
+    id: string;
+    name: string;
+    pinned: boolean;
+  };
+  isActive: boolean;
+  onClick: (chatId: string) => void;
+};
 
-// Export a function to toggle the sidebar that can be used by other components
-export function toggleSidebar() {
-  if (setSidebarOpen) {
-    setSidebarOpen(!isSidebarOpen);
-  }
+function ChatButton({ chat, isActive, onClick }: ChatButtonProps) {
+  return (
+    <Button
+      key={chat.id}
+      variant="ghost"
+      color="gray"
+      size="1"
+      my="1"
+      style={{
+        justifyContent: 'flex-start',
+        height: '22px',
+        backgroundColor: isActive ? 'var(--gray-5)' : undefined,
+        overflow: 'hidden',
+      }}
+      onClick={() => onClick(chat.id)}
+    >
+      {chat.pinned && <Pin size={12} style={{ marginRight: '8px', opacity: 0.7 }} />}
+      <Text
+        size="1"
+        style={{
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {chat.name}
+      </Text>
+    </Button>
+  );
+}
+
+// Header Component
+type HeaderProps = {
+  isMobile: boolean;
+  handleNewChat: () => void;
+  setSidebarOpen: (value: boolean) => void;
+};
+
+function SidebarHeader({ isMobile, handleNewChat, setSidebarOpen }: HeaderProps) {
+  return (
+    <Flex
+      p="3"
+      align="center"
+      justify="between"
+      style={{
+        height: '56px',
+        borderBottom: '1px solid var(--gray-5)',
+        position: 'relative',
+        flexShrink: 0,
+      }}
+    >
+      <Text size="3" weight="medium" style={{ paddingLeft: '4px' }}>
+        Electric Chat
+      </Text>
+      {!isMobile && (
+        <Tooltip content="New Chat">
+          <IconButton variant="ghost" size="2" onClick={handleNewChat}>
+            <MessageSquarePlus size={22} />
+          </IconButton>
+        </Tooltip>
+      )}
+      {isMobile && (
+        <IconButton
+          size="1"
+          variant="ghost"
+          style={{
+            position: 'absolute',
+            right: '12px',
+            opacity: 0.8,
+            height: '28px',
+            width: '28px',
+          }}
+          onClick={() => setSidebarOpen(false)}
+        >
+          ✕
+        </IconButton>
+      )}
+    </Flex>
+  );
+}
+
+// Footer Component
+type FooterProps = {
+  username: string;
+  theme: string | undefined;
+  setTheme: (theme: string) => void;
+  handleLogout: () => void;
+};
+
+function SidebarFooter({ username, theme, setTheme, handleLogout }: FooterProps) {
+  return (
+    <Box p="2" style={{ marginTop: 'auto' }}>
+      <Separator size="4" mb="2" />
+      <Flex align="center" justify="between" style={{ padding: '0 8px' }}>
+        <Flex align="center" gap="2">
+          <Text size="1">{username}</Text>
+        </Flex>
+        <Flex gap="3">
+          <Tooltip
+            content={
+              theme === 'dark' ? 'Light mode' : theme === 'light' ? 'System mode' : 'Dark mode'
+            }
+          >
+            <IconButton
+              size="1"
+              variant="ghost"
+              onClick={() => {
+                if (theme === 'dark') setTheme('light');
+                else if (theme === 'light') setTheme('system');
+                else setTheme('dark');
+              }}
+            >
+              {theme === 'dark' ? (
+                <Sun size={14} />
+              ) : theme === 'light' ? (
+                <Monitor size={14} />
+              ) : (
+                <Moon size={14} />
+              )}
+            </IconButton>
+          </Tooltip>
+          <Tooltip content="Log out">
+            <IconButton size="1" variant="ghost" color="red" onClick={handleLogout}>
+              <LogOut size={14} />
+            </IconButton>
+          </Tooltip>
+        </Flex>
+      </Flex>
+    </Box>
+  );
 }
 
 export default function Sidebar() {
   const { data: chats } = useChatsShape();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [sidebarOpen, setSidebarOpenState] = useState(false);
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const username = localStorage.getItem('username') || 'User';
+  const { isSidebarOpen, setSidebarOpen } = useSidebar();
 
   // Use TanStack Router to get current chat ID
   const matchRoute = useMatchRoute();
   const chatMatch = matchRoute({ to: '/chat/$chatId' });
   const currentChatId = chatMatch ? chatMatch.chatId : undefined;
-
-  // Set up the global toggle function
-  useEffect(() => {
-    isSidebarOpen = sidebarOpen;
-    setSidebarOpen = setSidebarOpenState;
-  }, [sidebarOpen]);
 
   // Set up window resize handler
   useEffect(() => {
@@ -51,14 +179,14 @@ export default function Sidebar() {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
       if (!mobile) {
-        setSidebarOpenState(false);
+        setSidebarOpen(false);
       }
     };
 
     handleResize(); // Call immediately
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [setSidebarOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem('username');
@@ -68,14 +196,14 @@ export default function Sidebar() {
   const handleChatClick = (chatId: string) => {
     navigate({ to: `/chat/${chatId}` });
     if (isMobile) {
-      setSidebarOpenState(false);
+      setSidebarOpen(false);
     }
   };
 
   const handleNewChat = () => {
     navigate({ to: '/' });
     if (isMobile) {
-      setSidebarOpenState(false);
+      setSidebarOpen(false);
     }
   };
 
@@ -97,58 +225,25 @@ export default function Sidebar() {
       {/* Sidebar overlay (mobile only) */}
       {isMobile && (
         <Box
-          className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
-          onClick={() => setSidebarOpenState(false)}
+          className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`}
+          onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <Box
-        className={`sidebar ${sidebarOpen ? 'open' : ''}`}
+        className={`sidebar ${isSidebarOpen ? 'open' : ''}`}
         style={{
           width: isMobile ? '280px' : '280px',
           height: '100%',
         }}
       >
         {/* Header */}
-        <Flex
-          p="3"
-          align="center"
-          justify="between"
-          style={{
-            height: '56px',
-            borderBottom: '1px solid var(--gray-5)',
-            position: 'relative',
-            flexShrink: 0,
-          }}
-        >
-          <Text size="3" weight="medium" style={{ paddingLeft: '4px' }}>
-            Electric Chat
-          </Text>
-          {!isMobile && (
-            <Tooltip content="New Chat">
-              <IconButton variant="ghost" size="2" onClick={handleNewChat}>
-                <MessageSquarePlus size={22} />
-              </IconButton>
-            </Tooltip>
-          )}
-          {isMobile && (
-            <IconButton
-              size="1"
-              variant="ghost"
-              style={{
-                position: 'absolute',
-                right: '12px',
-                opacity: 0.8,
-                height: '28px',
-                width: '28px',
-              }}
-              onClick={() => setSidebarOpenState(false)}
-            >
-              ✕
-            </IconButton>
-          )}
-        </Flex>
+        <SidebarHeader
+          isMobile={isMobile}
+          handleNewChat={handleNewChat}
+          setSidebarOpen={setSidebarOpen}
+        />
 
         {/* Prominent New Chat button for mobile */}
         {isMobile && (
@@ -184,38 +279,14 @@ export default function Sidebar() {
                       PINNED CHATS
                     </Text>
                   </Box>
-                  {pinnedChats.map(chat => {
-                    const isActive = chat.id === currentChatId;
-                    return (
-                      <Button
-                        key={chat.id}
-                        variant="ghost"
-                        color="gray"
-                        size="1"
-                        my="1"
-                        style={{
-                          justifyContent: 'flex-start',
-                          height: '22px',
-                          backgroundColor: isActive ? 'var(--gray-5)' : undefined,
-                          overflow: 'hidden',
-                        }}
-                        onClick={() => handleChatClick(chat.id)}
-                      >
-                        <Pin size={12} style={{ marginRight: '8px', opacity: 0.7 }} />
-                        <Text
-                          size="1"
-                          style={{
-                            maxWidth: '100%',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {chat.name}
-                        </Text>
-                      </Button>
-                    );
-                  })}
+                  {pinnedChats.map(chat => (
+                    <ChatButton
+                      key={chat.id}
+                      chat={chat}
+                      isActive={chat.id === currentChatId}
+                      onClick={handleChatClick}
+                    />
+                  ))}
                 </>
               )}
 
@@ -227,80 +298,25 @@ export default function Sidebar() {
               </Box>
 
               {/* Unpinned Chats */}
-              {unpinnedChats.map(chat => {
-                const isActive = chat.id === currentChatId;
-                return (
-                  <Button
-                    key={chat.id}
-                    variant="ghost"
-                    color="gray"
-                    size="1"
-                    my="1"
-                    style={{
-                      justifyContent: 'flex-start',
-                      height: '22px',
-                      backgroundColor: isActive ? 'var(--gray-5)' : undefined,
-                      overflow: 'hidden',
-                    }}
-                    onClick={() => handleChatClick(chat.id)}
-                  >
-                    <Text
-                      size="1"
-                      style={{
-                        maxWidth: '100%',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {chat.name}
-                    </Text>
-                  </Button>
-                );
-              })}
+              {unpinnedChats.map(chat => (
+                <ChatButton
+                  key={chat.id}
+                  chat={chat}
+                  isActive={chat.id === currentChatId}
+                  onClick={handleChatClick}
+                />
+              ))}
             </Flex>
           </div>
         </ScrollArea>
 
         {/* Footer */}
-        <Box p="2" style={{ marginTop: 'auto' }}>
-          <Separator size="4" mb="2" />
-          <Flex align="center" justify="between" style={{ padding: '0 8px' }}>
-            <Flex align="center" gap="2">
-              <Text size="1">{username}</Text>
-            </Flex>
-            <Flex gap="3">
-              <Tooltip
-                content={
-                  theme === 'dark' ? 'Light mode' : theme === 'light' ? 'System mode' : 'Dark mode'
-                }
-              >
-                <IconButton
-                  size="1"
-                  variant="ghost"
-                  onClick={() => {
-                    if (theme === 'dark') setTheme('light');
-                    else if (theme === 'light') setTheme('system');
-                    else setTheme('dark');
-                  }}
-                >
-                  {theme === 'dark' ? (
-                    <Sun size={14} />
-                  ) : theme === 'light' ? (
-                    <Monitor size={14} />
-                  ) : (
-                    <Moon size={14} />
-                  )}
-                </IconButton>
-              </Tooltip>
-              <Tooltip content="Log out">
-                <IconButton size="1" variant="ghost" color="red" onClick={handleLogout}>
-                  <LogOut size={14} />
-                </IconButton>
-              </Tooltip>
-            </Flex>
-          </Flex>
-        </Box>
+        <SidebarFooter
+          username={username}
+          theme={theme}
+          setTheme={setTheme}
+          handleLogout={handleLogout}
+        />
       </Box>
     </>
   );

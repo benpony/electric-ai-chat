@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-router';
 import { Flex } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
-import { ThemeProvider } from './components/theme-provider';
+import { Providers } from './components/Providers';
 import WelcomeScreen from './components/WelcomeScreen';
 import NewChatScreen from './components/NewChatScreen';
 import ChatScreen from './components/ChatScreen';
@@ -56,7 +56,7 @@ const rootRoute = createRootRoute({
     }
 
     return (
-      <ThemeProvider defaultTheme="light">
+      <Providers defaultTheme="light">
         <Flex style={{ height: '100vh', width: '100vw', overflow: 'hidden' }}>
           {isLoggedIn && <Sidebar />}
           <Flex
@@ -70,7 +70,7 @@ const rootRoute = createRootRoute({
             <Outlet />
           </Flex>
         </Flex>
-      </ThemeProvider>
+      </Providers>
     );
   },
 });

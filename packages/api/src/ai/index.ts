@@ -302,7 +302,7 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
           }
         } else if (toolCall.function.name === 'create_file') {
           const result = await createFile(chatId, args.path, args.mime_type, args.content);
-          const response = result.success 
+          const response = result.success
             ? `\n\nI've created the file "${args.path}"`
             : `\n\nFailed to create file "${args.path}": ${result.error}`;
           fullContent += response;
@@ -330,9 +330,10 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
           tokenBuffer += response;
         } else if (toolCall.function.name === 'read_file') {
           const result = await readFile(chatId, args.path);
-          const response = result.success && result.file
-            ? `\n\nHere's the contents of "${args.path}":\n\`\`\`\n${result.file.content}\n\`\`\``
-            : `\n\nFailed to read file "${args.path}": ${result.error}`;
+          const response =
+            result.success && result.file
+              ? `\n\nHere's the contents of "${args.path}":\n\`\`\`\n${result.file.content}\n\`\`\``
+              : `\n\nFailed to read file "${args.path}": ${result.error}`;
           fullContent += response;
           tokenBuffer += response;
         } else if (toolCall.function.name === 'rename_chat') {

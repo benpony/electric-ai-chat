@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useTheme } from './theme-provider';
+import { useTheme } from './ThemeProvider';
 import { abortMessage } from '../api';
 import { useState, useEffect } from 'react';
 import { Loader, OctagonX } from 'lucide-react';

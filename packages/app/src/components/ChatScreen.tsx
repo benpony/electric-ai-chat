@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from '@tanstack/react-router';
 import { Box, Flex, Text, TextField, IconButton, ScrollArea, Button } from '@radix-ui/themes';
 import { Menu } from 'lucide-react';
-import { toggleSidebar } from './Sidebar';
+import { useSidebar } from './SidebarProvider';
 import { useChat, useMessagesShape } from '../shapes';
 import { addMessage } from '../api';
 import AiResponse from './AiResponse';
@@ -19,6 +19,7 @@ export default function ChatScreen() {
   const scrollContentRef = useRef<HTMLDivElement>(null);
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
   const username = localStorage.getItem('username') || 'User';
+  const { toggleSidebar } = useSidebar();
 
   // Define CSS variables for theming that will adapt to dark mode
   const themeVariables = {

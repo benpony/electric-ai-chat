@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Box, Flex, Text, Heading, Button, IconButton, Tooltip } from '@radix-ui/themes';
 import { Sun, Moon, Monitor } from 'lucide-react';
-import { useTheme } from './theme-provider';
+import { useTheme } from './ThemeProvider';
 
 export default function WelcomeScreen() {
   const [username, setUsername] = useState('');

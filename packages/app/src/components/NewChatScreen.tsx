@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Box, Flex, Text, Heading, TextArea, IconButton } from '@radix-ui/themes';
 import { Send, Menu } from 'lucide-react';
 import { matchStream } from '@electric-sql/experimental';
-import { toggleSidebar } from './Sidebar';
+import { useSidebar } from './SidebarProvider';
 import { createChat } from '../api';
 import { useChatsShape, preloadMessages } from '../shapes';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,6 +15,7 @@ export default function NewChatScreen() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const username = localStorage.getItem('username') || 'User';
   const { stream } = useChatsShape();
+  const { toggleSidebar } = useSidebar();
 
   useEffect(() => {
     const handleResize = () => {
