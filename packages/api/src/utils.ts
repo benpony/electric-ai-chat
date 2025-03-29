@@ -1,5 +1,7 @@
 import { ChatMessage } from './types.js';
 
+export const model = 'gpt-4o-mini';
+
 export function rowToChatMessage(row: any): ChatMessage {
   return {
     id: row.id,

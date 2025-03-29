@@ -25,3 +25,14 @@ CREATE TABLE IF NOT EXISTS tokens (
     token_text TEXT,
     PRIMARY KEY (message_id, token_number)
 );
+
+CREATE TABLE IF NOT EXISTS files (
+    id UUID PRIMARY KEY,
+    chat_id UUID REFERENCES chats(id),
+    path TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT path_format CHECK (path !~ '^[/.]')
+);

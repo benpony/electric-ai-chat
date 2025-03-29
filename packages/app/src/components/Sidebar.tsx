@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useMatchRoute } from '@tanstack/react-router';
 import {
   Box,
   Flex,
@@ -13,6 +13,7 @@ import {
 import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin } from 'lucide-react';
 import { useTheme } from './theme-provider';
 import { useChatsShape } from '../shapes';
+import { FileList } from './FileList';
 
 // Create a global variable to track sidebar state
 let isSidebarOpen = false;
@@ -33,19 +34,10 @@ export default function Sidebar() {
   const { theme, setTheme } = useTheme();
   const username = localStorage.getItem('username') || 'User';
 
-  // Use window.location directly to determine current path
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
-
-  // Force re-render periodically to check current path
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (window.location.pathname !== currentPath) {
-        setCurrentPath(window.location.pathname);
-      }
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [currentPath]);
+  // Use TanStack Router to get current chat ID
+  const matchRoute = useMatchRoute();
+  const chatMatch = matchRoute({ to: '/chat/$chatId' });
+  const currentChatId = chatMatch ? chatMatch.chatId : undefined;
 
   // Set up the global toggle function
   useEffect(() => {
@@ -177,6 +169,9 @@ export default function Sidebar() {
           </Box>
         )}
 
+        {/* Files Section for Active Chat */}
+        {currentChatId && <FileList chatId={currentChatId} />}
+
         {/* Chats */}
         <ScrollArea>
           <div className="sidebar-content">
@@ -190,8 +185,7 @@ export default function Sidebar() {
                     </Text>
                   </Box>
                   {pinnedChats.map(chat => {
-                    const chatPath = `/chat/${chat.id}`;
-                    const isActive = currentPath === chatPath;
+                    const isActive = chat.id === currentChatId;
                     return (
                       <Button
                         key={chat.id}
@@ -234,8 +228,7 @@ export default function Sidebar() {
 
               {/* Unpinned Chats */}
               {unpinnedChats.map(chat => {
-                const chatPath = `/chat/${chat.id}`;
-                const isActive = currentPath === chatPath;
+                const isActive = chat.id === currentChatId;
                 return (
                   <Button
                     key={chat.id}

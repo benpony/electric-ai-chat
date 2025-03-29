@@ -131,3 +131,42 @@ export function useTokensShape(messageId: string) {
   }, [messageId]);
   return useShape(tokensShapeConfig(messageId, abortController));
 }
+
+// File Shape
+
+export interface File extends MessageRow {
+  id: string;
+  chat_id: string;
+  path: string;
+  mime_type: string;
+  content: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export function filesShapeConfig(chatId: string): ShapeOptions<File> {
+  return {
+    url: `${ELECTRIC_API_URL}/v1/shape`,
+    params: {
+      table: 'files',
+      where: `chat_id = '${chatId}'`,
+    },
+    parser: {
+      timestamptz: (value: string) => new Date(value),
+    },
+  };
+}
+
+export function useFilesShape(chatId: string) {
+  return useShape(filesShapeConfig(chatId));
+}
+
+export async function preloadFiles(chatId: string) {
+  await preloadShape({
+    url: `${ELECTRIC_API_URL}/v1/shape`,
+    params: {
+      table: 'files',
+      where: `chat_id = '${chatId}'`,
+    },
+  });
+}

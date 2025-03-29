@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { db } from '../../db.js';
 import { ChatCompletionTool } from 'openai/resources/chat/completions';
+import { model } from '../../utils.js';
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_KEY,
@@ -10,7 +11,7 @@ const openai = new OpenAI({
 export async function generateChatName(message: string) {
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model,
       messages: [
         {
           role: 'system',
