@@ -7,7 +7,7 @@ import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme } from './ThemeProvider';
 import { abortMessage } from '../api';
 import { useState, useEffect, memo } from 'react';
-import { Loader, OctagonX } from 'lucide-react';
+import { Loader, OctagonX, Copy, Check } from 'lucide-react';
 
 interface StopButtonProps {
   onStop: () => void;
@@ -80,6 +80,40 @@ function StopButton({ onStop, isAborting = false }: StopButtonProps) {
   );
 }
 
+function CopyButton({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  return (
+    <Tooltip content={copied ? 'Copied!' : 'Copy code'}>
+      <IconButton
+        size="1"
+        variant="ghost"
+        color="gray"
+        onClick={handleCopy}
+        style={{
+          position: 'absolute',
+          right: '6px',
+          top: '13px',
+          opacity: 0.5,
+        }}
+        className="copy-button"
+      >
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+      </IconButton>
+    </Tooltip>
+  );
+}
+
 function MarkdownMessage({ content }: { content: string }) {
   const { theme } = useTheme();
   const syntaxTheme = theme === 'dark' ? vscDarkPlus : oneLight;
@@ -112,7 +146,9 @@ function MarkdownMessage({ content }: { content: string }) {
                     borderRadius: '5px',
                     overflow: 'auto',
                     margin: '1em 0',
+                    position: 'relative',
                   }}
+                  className="code-block"
                   {...props}
                 >
                   {children}
@@ -137,14 +173,17 @@ function MarkdownMessage({ content }: { content: string }) {
                     {children}
                   </code>
                 ) : (
-                  <SyntaxHighlighter
-                    style={syntaxTheme}
-                    language={language}
-                    PreTag="div"
-                    className="syntax-highlighter"
-                  >
-                    {String(children).replace(/\n$/, '')}
-                  </SyntaxHighlighter>
+                  <>
+                    <CopyButton content={String(children).replace(/\n$/, '')} />
+                    <SyntaxHighlighter
+                      style={syntaxTheme}
+                      language={language}
+                      PreTag="div"
+                      className="syntax-highlighter"
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                  </>
                 );
               },
               a: ({ children, ...props }) => (
