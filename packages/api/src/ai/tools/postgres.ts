@@ -25,6 +25,38 @@ interface SchemaToolParams {
   password: string; // Password is sent with each request
 }
 
+// Helper function to create a PostgreSQL connection with read-only permissions
+function createReadOnlyConnection(redactedUrl: string, password: string) {
+  // Create a URL object to properly handle the replacement
+  const urlObj = new URL(redactedUrl);
+
+  // Extract the username from the auth part
+  const authParts = urlObj.username.split(':');
+  if (authParts.length > 1) {
+    urlObj.username = authParts[0];
+    urlObj.password = password;
+  } else {
+    // If there's no colon in the username, set the password directly
+    urlObj.password = password;
+  }
+
+  const actualUrl = urlObj.toString();
+  console.log('Actual URL (with password hidden):', actualUrl.replace(password, '[HIDDEN]'));
+
+  // Create a read-only connection
+  return postgres(actualUrl, {
+    max: 1,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    ssl: 'require',
+    transform: {
+      undefined: null,
+    },
+    prepare: false,
+    max_lifetime: 60 * 30,
+  });
+}
+
 /**
  * Get the schema information for a database
  */
@@ -35,35 +67,9 @@ export async function getDatabaseSchema(
   console.log('Connecting to database with URL:', redactedUrl);
   console.log('Using password (first 3 chars):', password.substring(0, 3) + '...');
 
-  // Create a URL object to properly handle the replacement
   try {
-    const urlObj = new URL(redactedUrl);
-
-    // Extract the username from the auth part
-    const authParts = urlObj.username.split(':');
-    if (authParts.length > 1) {
-      urlObj.username = authParts[0];
-      urlObj.password = password;
-    } else {
-      // If there's no colon in the username, set the password directly
-      urlObj.password = password;
-    }
-
-    const actualUrl = urlObj.toString();
-    console.log('Actual URL (with password hidden):', actualUrl.replace(password, '[HIDDEN]'));
-
-    // Create a read-only connection
-    const sql = postgres(actualUrl, {
-      max: 1,
-      idle_timeout: 20,
-      connect_timeout: 10,
-      ssl: 'require',
-      transform: {
-        undefined: null,
-      },
-      prepare: false,
-      max_lifetime: 60 * 30,
-    });
+    // Create connection
+    const sql = createReadOnlyConnection(redactedUrl, password);
 
     try {
       // Get all tables in the public schema
@@ -150,6 +156,42 @@ export async function getDatabaseSchema(
 }
 
 /**
+ * Execute a read-only SQL query on a PostgreSQL database
+ */
+export async function executeReadOnlyQuery(
+  redactedUrl: string,
+  password: string,
+  query: string
+): Promise<any[]> {
+  console.log('Executing read-only query on database:', redactedUrl);
+  console.log('Query:', query);
+
+  try {
+    // Create connection
+    const sql = createReadOnlyConnection(redactedUrl, password);
+
+    try {
+      // Start a read-only transaction
+      const results = await sql.begin(async tx => {
+        // Set transaction to read only
+        await tx`SET TRANSACTION READ ONLY`;
+
+        // Execute the query
+        return await tx.unsafe(query);
+      });
+
+      // Format results for better readability
+      return Array.isArray(results) ? results : [results];
+    } finally {
+      await sql.end();
+    }
+  } catch (error) {
+    console.error('Error executing query:', error);
+    throw error;
+  }
+}
+
+/**
  * Tool definition for the AI to get database schema
  */
 export const getSchemaTool: ChatCompletionTool = {
@@ -174,10 +216,40 @@ export const getSchemaTool: ChatCompletionTool = {
           description: 'The actual database password',
         },
       },
-      required: ['redactedUrl', 'redactedId', 'password'],
+      required: ['redactedUrl', 'redactedId'],
+    },
+  },
+};
+
+/**
+ * Tool definition for the AI to execute read-only queries
+ */
+export const executeQueryTool: ChatCompletionTool = {
+  type: 'function' as const,
+  function: {
+    name: 'execute_postgres_query',
+    description:
+      'Execute a read-only SQL query on a PostgreSQL database to get information about the data. Use this for SELECT queries to retrieve data when users ask about database contents. Queries are executed in read-only mode for security.',
+    parameters: {
+      type: 'object',
+      properties: {
+        redactedUrl: {
+          type: 'string',
+          description: 'The redacted database URL',
+        },
+        redactedId: {
+          type: 'string',
+          description: 'The redacted ID for the database password',
+        },
+        query: {
+          type: 'string',
+          description: 'The SQL query to execute (must be read-only, write operations will fail)',
+        },
+      },
+      required: ['redactedUrl', 'redactedId', 'query'],
     },
   },
 };
 
 // Export all PostgreSQL tools as a single array
-export const postgresTools = [getSchemaTool]; 
+export const postgresTools = [getSchemaTool, executeQueryTool];

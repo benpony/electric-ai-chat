@@ -9,6 +9,7 @@ import { addMessage } from '../api';
 import AiResponse from './AiResponse';
 import { ChatSidebar } from './ChatSidebar';
 import { processDatabaseUrl } from '../utils/db-url';
+import { getChatPasswords } from '../utils/password-store';
 
 type Message = {
   id: string;
@@ -292,15 +293,47 @@ export default function ChatScreen() {
     }
   }, [messages, shouldScrollToBottom]);
 
-  const handleMessageSubmit = async (
-    messageText: string,
-    dbUrl?: { redactedUrl: string; redactedId: string; password: string }
-  ) => {
+  const handleMessageSubmit = async (messageText: string) => {
     try {
       setIsLoading(true);
 
+      // Process the message to check for database URLs
+      const processedData = processDatabaseUrl(messageText, chatId);
+      let messageToSend = processedData.message;
+      let dbUrlToSend = processedData.dbUrl;
+
+      // If no database URL was found in this message, check if we have stored passwords
+      // for this chat and use the most recent one if available
+      if (!dbUrlToSend) {
+        const storedPasswords = getChatPasswords(chatId);
+
+        if (storedPasswords.size > 0) {
+          // Get the most recent database URL from the password store
+          // This assumes the latest entry is the one we want - alternatively we could
+          // create a specific function to get the latest password
+          const entries = Array.from(storedPasswords.entries());
+          const [latestRedactedId, latestPassword] = entries[entries.length - 1];
+
+          // We need to create a dbUrl object with the redacted URL
+          // This assumes the URL format is postgresql://username:PASSWORD@host:port/database
+          // We need to extract this pattern from a previous message
+          const urlPattern = messages
+            .find(msg => msg.content.includes(`redacted-`) && msg.content.includes('postgresql'))
+            ?.content.match(/(?:postgres|postgresql):\/\/[^@]+@[^\s]+/);
+
+          if (urlPattern) {
+            // Create the dbUrl object with the stored information
+            dbUrlToSend = {
+              redactedUrl: urlPattern[0],
+              redactedId: latestRedactedId,
+              password: latestPassword,
+            };
+          }
+        }
+      }
+
       // Send message to API
-      await addMessage(chatId, messageText, username, dbUrl);
+      await addMessage(chatId, messageToSend, username, dbUrlToSend);
 
       // Force scroll to bottom when user sends a message
       setShouldScrollToBottom(true);

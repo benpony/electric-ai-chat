@@ -21,7 +21,7 @@ import {
   renameFile,
   readFile,
 } from './tools/files.js';
-import { getDatabaseSchema, postgresTools } from './tools/postgres.js';
+import { getDatabaseSchema, executeReadOnlyQuery, postgresTools } from './tools/postgres.js';
 import { processStreamChunks } from './stream.js';
 import { model } from '../utils.js';
 
@@ -361,6 +361,69 @@ async function processAIStream(
           tokenBuffer = result.tokenBuffer;
           lastInsertTime = result.lastInsertTime;
           continue; // Skip the rest of the tool calls since we've handled this one
+        } else if (toolCall.function.name === 'execute_postgres_query') {
+          console.log('Tool call arguments:', args);
+
+          if (!dbUrlParam) {
+            console.log('No database URL provided in the request');
+            const response =
+              '\n\nI need a database URL to execute queries. Please provide one in your message.';
+            fullContent += response;
+            tokenBuffer += response;
+            continue;
+          }
+
+          console.log('Using database URL from request params');
+          console.log('Query to execute:', args.query);
+
+          try {
+            // Execute the query in read-only mode
+            const results = await executeReadOnlyQuery(
+              args.redactedUrl,
+              dbUrlParam.password,
+              args.query
+            );
+
+            // Format results for better display
+            const formattedResults = JSON.stringify(results, null, 2);
+
+            // Instead of outputting directly, add the query results as context and continue the conversation
+            messages.push({
+              role: 'system',
+              content: `Here are the results of your SQL query:\n\`\`\`json\n${formattedResults}\n\`\`\`\nPlease use these results to answer the user's question.`,
+            } as ChatCompletionSystemMessageParam);
+
+            // Get a new completion with the updated context
+            const completion = await openai.chat.completions.create({
+              model,
+              messages,
+              stream: true,
+              tools,
+              tool_choice: 'auto',
+              max_tokens: 4000, // Limit response size
+            });
+
+            // Process the new stream
+            const result = await processStreamChunks(
+              completion,
+              messageId,
+              tokenNumber,
+              tokenBuffer,
+              lastInsertTime
+            );
+            fullContent += result.fullContent;
+            tokenNumber = result.tokenNumber;
+            tokenBuffer = result.tokenBuffer;
+            lastInsertTime = result.lastInsertTime;
+            continue; // Skip the rest of the tool calls since we've handled this one
+          } catch (error) {
+            console.error('Error executing query:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            const response = `\n\nError executing query: ${errorMessage}`;
+            fullContent += response;
+            tokenBuffer += response;
+            continue;
+          }
         } else if (toolCall.function.name === 'create_file') {
           const result = await createFile(chatId, args.path, args.mime_type, args.content);
           const response = result.success
