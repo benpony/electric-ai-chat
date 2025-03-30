@@ -15,7 +15,7 @@ This project demonstrates:
 ## Outline
 
 - [What is Electric?](#what-is-electric)
-- [Tech Stack](#tech-stack) 
+- [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
 - [LLM Tools Integration](#llm-tools-integration)
 - [ElectricSQL Benefits for AI Applications](#electricsql-benefits-for-ai-applications)

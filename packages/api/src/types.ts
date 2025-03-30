@@ -58,3 +58,18 @@ export interface CreateMessageRequest {
     password: string;
   };
 }
+
+export interface ToolHandler {
+  name: string;
+  getThinkingText: (args: unknown) => string;
+  process: (
+    args: unknown,
+    chatId: string,
+    messageId: string,
+    dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+  ) => Promise<{
+    content: string;
+    systemMessage?: string;
+    requiresReentry?: boolean;
+  }>;
+}

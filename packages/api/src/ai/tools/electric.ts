@@ -1,4 +1,5 @@
 import { ChatCompletionTool } from 'openai/resources/chat/completions';
+import { ToolHandler } from '../../types.js';
 
 export const ELECTRIC_DOCS_URL = 'https://electric-sql.com/llms.txt';
 
@@ -51,6 +52,34 @@ export const electricTools: ChatCompletionTool[] = [
         },
         required: ['query'],
       },
+    },
+  },
+];
+
+// Tool handlers
+export const electricToolHandlers: ToolHandler[] = [
+  {
+    name: 'fetch_electric_docs',
+    getThinkingText: (args: unknown) => 'Fetching ElectricSQL documentation...',
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { query } = args as { query: string };
+      // Add the chatId to the set of ElectricSQL chats
+      electricChats.add(chatId);
+      const docs = await fetchElectricDocs();
+      if (docs) {
+        return {
+          content: '',
+          systemMessage: `Here's the relevant ElectricSQL documentation for "${query}":\n${docs}`,
+          requiresReentry: true,
+        };
+      } else {
+        return { content: '\n\nFailed to fetch ElectricSQL documentation.' };
+      }
     },
   },
 ];

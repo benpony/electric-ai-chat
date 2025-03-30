@@ -8,20 +8,18 @@ import type {
 import { Shape, ShapeStream } from '@electric-sql/client';
 import { randomUUID } from 'crypto';
 import { db } from '../db.js';
-import { ChatMessage, ToolCall } from '../types.js';
+import { ChatMessage, ToolCall, ToolHandler } from '../types.js';
 import { rowToChatMessage } from '../utils.js';
 import { systemPrompt } from './system-prompt.js';
-import { basicTools, renameChat, renameChatTo, pinChat, generateChatName } from './tools/basic.js';
-import { electricTools, electricChats, fetchElectricDocs } from './tools/electric.js';
+import { basicTools, basicToolHandlers, generateChatName } from './tools/basic.js';
 import {
-  fileTools,
-  createFile,
-  editFile,
-  deleteFile,
-  renameFile,
-  readFile,
-} from './tools/files.js';
-import { getDatabaseSchema, executeReadOnlyQuery, postgresTools } from './tools/postgres.js';
+  electricTools,
+  electricToolHandlers,
+  electricChats,
+  fetchElectricDocs,
+} from './tools/electric.js';
+import { fileTools, fileToolHandlers } from './tools/files.js';
+import { postgresTools, postgresToolHandlers } from './tools/postgres.js';
 import { processStreamChunks } from './stream.js';
 import { model } from '../utils.js';
 
@@ -31,6 +29,18 @@ const ELECTRIC_API_URL = process.env.ELECTRIC_API_URL || 'http://localhost:3000'
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_KEY,
+});
+
+// Combine all tool handlers and create a map for quick lookup
+const allToolHandlers = [
+  ...basicToolHandlers,
+  ...electricToolHandlers,
+  ...fileToolHandlers,
+  ...postgresToolHandlers,
+];
+const toolHandlerMap = new Map<string, ToolHandler>();
+allToolHandlers.forEach(handler => {
+  toolHandlerMap.set(handler.name, handler);
 });
 
 // Helper function to create AI response
@@ -118,39 +128,18 @@ async function processToolCall(
   requiresReentry?: boolean;
 }> {
   try {
-    const args = JSON.parse(toolCall.function.arguments);
+    const args = JSON.parse(toolCall.function.arguments) as unknown;
     console.log('Processing tool call:', toolCall.function.name, args);
 
-    // Set thinking text based on the tool being called
-    let thinkingText = '';
-    switch (toolCall.function.name) {
-      case 'execute_postgres_query':
-        thinkingText = `Running SQL query: ${args.query.substring(0, 50)}${args.query.length > 50 ? '...' : ''}`;
-        break;
-      case 'create_file':
-        thinkingText = `Creating file: ${args.path}`;
-        break;
-      case 'edit_file':
-        thinkingText = `Editing file: ${args.path}`;
-        break;
-      case 'delete_file':
-        thinkingText = `Deleting file: ${args.path}`;
-        break;
-      case 'rename_file':
-        thinkingText = `Renaming file: ${args.old_path} → ${args.new_path}`;
-        break;
-      case 'read_file':
-        thinkingText = `Reading file: ${args.path}`;
-        break;
-      case 'fetch_electric_docs':
-        thinkingText = 'Fetching ElectricSQL documentation...';
-        break;
-      case 'get_database_schema':
-        thinkingText = 'Getting database schema...';
-        break;
-      default:
-        thinkingText = `Running ${toolCall.function.name}...`;
+    // Find the handler for this tool
+    const handler = toolHandlerMap.get(toolCall.function.name);
+
+    if (!handler) {
+      return { content: `\n\nUnsupported tool call: ${toolCall.function.name}` };
     }
+
+    // Set thinking text based on the handler
+    const thinkingText = handler.getThinkingText(args);
 
     // Update the message with the thinking text
     await db`
@@ -159,187 +148,42 @@ async function processToolCall(
       WHERE id = ${messageId}
     `;
 
-    let result: { content: string; systemMessage?: string; requiresReentry?: boolean } = { content: '' };
-    switch (toolCall.function.name) {
-      case 'fetch_electric_docs': {
-        // Add the chatId to the set of ElectricSQL chats
-        electricChats.add(chatId);
-        const docs = await fetchElectricDocs();
-        if (docs) {
-          result = {
-            content: '',
-            systemMessage: `Here's the relevant ElectricSQL documentation for "${args.query}":\n${docs}`,
-            requiresReentry: true,
-          };
-        } else {
-          result = { content: '\n\nFailed to fetch ElectricSQL documentation.' };
-        }
-        break;
-      }
+    try {
+      // Process the tool call
+      const result = await handler.process(args, chatId, messageId, dbUrlParam);
 
-      case 'get_database_schema': {
-        if (!dbUrlParam) {
-          result = {
-            content:
-              '\n\nI need a database URL to get the schema. Please provide one in your message.',
-          };
-        } else {
-          // Get the schema from the database
-          const schema = await getDatabaseSchema(args.redactedUrl, dbUrlParam.password);
-          result = {
-            content: '',
-            systemMessage: `Here's the database schema information:\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`\nPlease use this information to answer the user's question about the database schema.`,
-            requiresReentry: true,
-          };
-        }
-        break;
-      }
+      // Clear the thinking text
+      await db`
+        UPDATE messages
+        SET thinking_text = ''
+        WHERE id = ${messageId}
+      `;
 
-      case 'execute_postgres_query': {
-        if (!dbUrlParam) {
-          result = {
-            content:
-              '\n\nI need a database URL to execute queries. Please provide one in your message.',
-          };
-        } else {
-          try {
-            // Execute the query in read-only mode
-            const results = await executeReadOnlyQuery(
-              args.redactedUrl,
-              dbUrlParam.password,
-              args.query
-            );
+      return result;
+    } catch (error) {
+      console.error(`Error processing ${toolCall.function.name}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
 
-            // Format results for better display
-            const formattedResults = JSON.stringify(results, null, 2);
-            result = {
-              content: '',
-              systemMessage: `Here are the results of your SQL query:\n\`\`\`json\n${formattedResults}\n\`\`\`\nPlease use these results to answer the user's question.`,
-              requiresReentry: true,
-            };
-          } catch (error) {
-            console.error('Error executing query:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-            result = { content: `\n\nError executing query: ${errorMessage}` };
-          }
-        }
-        break;
-      }
+      // Clear the thinking text on error
+      await db`
+        UPDATE messages
+        SET thinking_text = ''
+        WHERE id = ${messageId}
+      `;
 
-      case 'create_file': {
-        const fileResult = await createFile(chatId, args.path, args.mime_type, args.content);
-        result = {
-          content: '',
-          systemMessage: fileResult.success
-            ? `I've created the file "${args.path}" with the following content:\n\`\`\`\n${args.content}\n\`\`\`\nPlease continue the conversation with this information.`
-            : `I was unable to create file "${args.path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
-          requiresReentry: true,
-        };
-        break;
-      }
-
-      case 'edit_file': {
-        const fileResult = await editFile(chatId, args.path, args.content);
-        result = {
-          content: '',
-          systemMessage: fileResult.success
-            ? `I've updated the file "${args.path}" with the following content:\n\`\`\`\n${args.content}\n\`\`\`\nPlease continue the conversation with this information.`
-            : `I was unable to update file "${args.path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
-          requiresReentry: true,
-        };
-        break;
-      }
-
-      case 'delete_file': {
-        const fileResult = await deleteFile(chatId, args.path);
-        result = {
-          content: '',
-          systemMessage: fileResult.success
-            ? `I've successfully deleted the file "${args.path}". Please continue the conversation with this information.`
-            : `I was unable to delete file "${args.path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
-          requiresReentry: true,
-        };
-        break;
-      }
-
-      case 'rename_file': {
-        const fileResult = await renameFile(chatId, args.old_path, args.new_path);
-        result = {
-          content: '',
-          systemMessage: fileResult.success
-            ? `I've successfully renamed "${args.old_path}" to "${args.new_path}". Please continue the conversation with this information.`
-            : `I was unable to rename file from "${args.old_path}" to "${args.new_path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
-          requiresReentry: true,
-        };
-        break;
-      }
-
-      case 'read_file': {
-        const fileResult = await readFile(chatId, args.path);
-        result = {
-          content: '',
-          systemMessage:
-            fileResult.success && fileResult.file
-              ? `Here's the contents of "${args.path}":\n\`\`\`\n${fileResult.file.content}\n\`\`\`\nPlease continue the conversation with this information.`
-              : `I was unable to read file "${args.path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
-          requiresReentry: true,
-        };
-        break;
-      }
-
-      case 'rename_chat': {
-        const newName = await renameChat(chatId, args.context);
-        result = {
-          content: newName
-            ? `\n\nI've renamed this chat to: "${newName}"`
-            : '\n\nFailed to rename chat.',
-        };
-        break;
-      }
-
-      case 'rename_chat_to': {
-        const newName = await renameChatTo(chatId, args.name);
-        result = {
-          content: newName
-            ? `\n\nI've renamed this chat to: "${newName}"`
-            : '\n\nFailed to rename chat.',
-        };
-        break;
-      }
-
-      case 'pin_chat': {
-        const success = await pinChat(chatId, args.pinned);
-        result = {
-          content: success
-            ? `\n\nI've ${args.pinned ? 'pinned' : 'unpinned'} this chat.`
-            : '\n\nFailed to update pin status.',
-        };
-        break;
-      }
-
-      default:
-        result = { content: `\n\nUnsupported tool call: ${toolCall.function.name}` };
+      return { content: `\n\nError processing ${toolCall.function.name}: ${errorMessage}` };
     }
-
-    // Clear the thinking text
-    await db`
-      UPDATE messages
-      SET thinking_text = ''
-      WHERE id = ${messageId}
-    `;
-
-    return result;
   } catch (error) {
     console.error('Error processing tool call:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
+
     // Clear the thinking text on error
     await db`
       UPDATE messages
       SET thinking_text = ''
       WHERE id = ${messageId}
     `;
-    
+
     return { content: `\n\nError processing tool call: ${errorMessage}` };
   }
 }

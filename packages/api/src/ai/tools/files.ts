@@ -1,6 +1,7 @@
 import { ChatCompletionTool } from 'openai/resources/chat/completions';
 import { db } from '../../db.js';
 import { randomUUID } from 'crypto';
+import { ToolHandler } from '../../types.js';
 
 // File management tools
 export const fileTools: ChatCompletionTool[] = [
@@ -197,3 +198,127 @@ export async function readFile(chatId: string, path: string) {
     return { success: false, error: 'Failed to read file' };
   }
 }
+
+// Tool handlers
+export const fileToolHandlers: ToolHandler[] = [
+  {
+    name: 'create_file',
+    getThinkingText: (args: unknown) => {
+      const { path } = args as { path: string };
+      return `Creating file: ${path}`;
+    },
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { path, mime_type, content } = args as {
+        path: string;
+        mime_type: string;
+        content: string;
+      };
+      const fileResult = await createFile(chatId, path, mime_type, content);
+      return {
+        content: '',
+        systemMessage: fileResult.success
+          ? `I've created the file "${path}" with the following content:\n\`\`\`\n${content}\n\`\`\`\nPlease continue the conversation with this information.`
+          : `I was unable to create file "${path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
+        requiresReentry: true,
+      };
+    },
+  },
+  {
+    name: 'edit_file',
+    getThinkingText: (args: unknown) => {
+      const { path } = args as { path: string };
+      return `Editing file: ${path}`;
+    },
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { path, content } = args as { path: string; content: string };
+      const fileResult = await editFile(chatId, path, content);
+      return {
+        content: '',
+        systemMessage: fileResult.success
+          ? `I've updated the file "${path}" with the following content:\n\`\`\`\n${content}\n\`\`\`\nPlease continue the conversation with this information.`
+          : `I was unable to update file "${path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
+        requiresReentry: true,
+      };
+    },
+  },
+  {
+    name: 'delete_file',
+    getThinkingText: (args: unknown) => {
+      const { path } = args as { path: string };
+      return `Deleting file: ${path}`;
+    },
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { path } = args as { path: string };
+      const fileResult = await deleteFile(chatId, path);
+      return {
+        content: '',
+        systemMessage: fileResult.success
+          ? `I've successfully deleted the file "${path}". Please continue the conversation with this information.`
+          : `I was unable to delete file "${path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
+        requiresReentry: true,
+      };
+    },
+  },
+  {
+    name: 'rename_file',
+    getThinkingText: (args: unknown) => {
+      const { old_path, new_path } = args as { old_path: string; new_path: string };
+      return `Renaming file: ${old_path} → ${new_path}`;
+    },
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { old_path, new_path } = args as { old_path: string; new_path: string };
+      const fileResult = await renameFile(chatId, old_path, new_path);
+      return {
+        content: '',
+        systemMessage: fileResult.success
+          ? `I've successfully renamed "${old_path}" to "${new_path}". Please continue the conversation with this information.`
+          : `I was unable to rename file from "${old_path}" to "${new_path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
+        requiresReentry: true,
+      };
+    },
+  },
+  {
+    name: 'read_file',
+    getThinkingText: (args: unknown) => {
+      const { path } = args as { path: string };
+      return `Reading file: ${path}`;
+    },
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { path } = args as { path: string };
+      const fileResult = await readFile(chatId, path);
+      return {
+        content: '',
+        systemMessage:
+          fileResult.success && fileResult.file
+            ? `Here's the contents of "${path}":\n\`\`\`\n${fileResult.file.content}\n\`\`\`\nPlease continue the conversation with this information.`
+            : `I was unable to read file "${path}". Error: ${fileResult.error}\nPlease continue the conversation with this information.`,
+        requiresReentry: true,
+      };
+    },
+  },
+];

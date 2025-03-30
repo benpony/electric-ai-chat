@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { db } from '../../db.js';
 import { ChatCompletionTool } from 'openai/resources/chat/completions';
 import { model } from '../../utils.js';
+import { ToolHandler } from '../../types.js';
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_KEY,
@@ -137,6 +138,70 @@ export const basicTools: ChatCompletionTool[] = [
         },
         required: ['pinned'],
       },
+    },
+  },
+];
+
+// Tool handlers
+export const basicToolHandlers: ToolHandler[] = [
+  {
+    name: 'rename_chat',
+    getThinkingText: (args: unknown) => 'Renaming chat...',
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { context } = args as { context: string };
+      const newName = await renameChat(chatId, context);
+      return {
+        content: newName
+          ? `\n\nI've renamed this chat to: "${newName}"`
+          : '\n\nFailed to rename chat.',
+      };
+    },
+  },
+  {
+    name: 'rename_chat_to',
+    getThinkingText: (args: unknown) => {
+      const { name } = args as { name: string };
+      return `Renaming chat to: "${name}"`;
+    },
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { name } = args as { name: string };
+      const newName = await renameChatTo(chatId, name);
+      return {
+        content: newName
+          ? `\n\nI've renamed this chat to: "${newName}"`
+          : '\n\nFailed to rename chat.',
+      };
+    },
+  },
+  {
+    name: 'pin_chat',
+    getThinkingText: (args: unknown) => {
+      const { pinned } = args as { pinned: boolean };
+      return `${pinned ? 'Pinning' : 'Unpinning'} chat...`;
+    },
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { pinned } = args as { pinned: boolean };
+      const success = await pinChat(chatId, pinned);
+      return {
+        content: success
+          ? `\n\nI've ${pinned ? 'pinned' : 'unpinned'} this chat.`
+          : '\n\nFailed to update pin status.',
+      };
     },
   },
 ];

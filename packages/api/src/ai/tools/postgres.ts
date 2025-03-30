@@ -1,5 +1,6 @@
 import { ChatCompletionTool } from 'openai/resources/chat/completions';
 import postgres from 'postgres';
+import { ToolHandler } from '../../types.js';
 
 interface SchemaInfo {
   tableName: string;
@@ -251,5 +252,73 @@ export const executeQueryTool: ChatCompletionTool = {
   },
 };
 
-// Export all PostgreSQL tools as a single array
-export const postgresTools = [getSchemaTool, executeQueryTool];
+// Export the array of tools
+export const postgresTools: ChatCompletionTool[] = [getSchemaTool, executeQueryTool];
+
+// Tool handlers
+export const postgresToolHandlers: ToolHandler[] = [
+  {
+    name: 'get_database_schema',
+    getThinkingText: (args: unknown) => 'Getting database schema...',
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      if (!dbUrlParam) {
+        return {
+          content:
+            '\n\nI need a database URL to get the schema. Please provide one in your message.',
+        };
+      } else {
+        const { redactedUrl } = args as { redactedUrl: string };
+        // Get the schema from the database
+        const schema = await getDatabaseSchema(redactedUrl, dbUrlParam.password);
+        return {
+          content: '',
+          systemMessage: `Here's the database schema information:\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`\nPlease use this information to answer the user's question about the database schema.`,
+          requiresReentry: true,
+        };
+      }
+    },
+  },
+  {
+    name: 'execute_postgres_query',
+    getThinkingText: (args: unknown) => {
+      const { query } = args as { query: string };
+      return `Running SQL query: ${query.substring(0, 50)}${query.length > 50 ? '...' : ''}`;
+    },
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      if (!dbUrlParam) {
+        return {
+          content:
+            '\n\nI need a database URL to execute queries. Please provide one in your message.',
+        };
+      } else {
+        try {
+          const { redactedUrl, query } = args as { redactedUrl: string; query: string };
+          // Execute the query in read-only mode
+          const results = await executeReadOnlyQuery(redactedUrl, dbUrlParam.password, query);
+
+          // Format results for better display
+          const formattedResults = JSON.stringify(results, null, 2);
+          return {
+            content: '',
+            systemMessage: `Here are the results of your SQL query:\n\`\`\`json\n${formattedResults}\n\`\`\`\nPlease use these results to answer the user's question.`,
+            requiresReentry: true,
+          };
+        } catch (error) {
+          console.error('Error executing query:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          return { content: `\n\nError executing query: ${errorMessage}` };
+        }
+      }
+    },
+  },
+];
