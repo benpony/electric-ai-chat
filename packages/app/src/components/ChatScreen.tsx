@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { useParams } from '@tanstack/react-router';
-import { Box, Flex, Text, TextField, IconButton, ScrollArea, Button } from '@radix-ui/themes';
-import { Menu } from 'lucide-react';
+import { Box, Flex, Text, IconButton, ScrollArea, TextArea } from '@radix-ui/themes';
+import { Menu, Send } from 'lucide-react';
 import { useSidebar } from './SidebarProvider';
 import { useChat, useMessagesShape } from '../shapes';
 import { addMessage } from '../api';
@@ -30,6 +30,53 @@ interface MessageInputProps {
   isLoading: boolean;
 }
 
+interface UserPromptProps {
+  message: Message;
+  isCurrentUser: boolean;
+}
+
+// UserPrompt component to display user messages
+const UserPrompt = memo(({ message, isCurrentUser }: UserPromptProps) => {
+  return (
+    <Flex
+      direction="column"
+      style={{
+        maxWidth: '60%',
+        marginBottom: '10px',
+        alignItems: isCurrentUser ? 'flex-end' : 'flex-start',
+      }}
+    >
+      {!isCurrentUser && (
+        <Text
+          size="1"
+          style={{
+            color: 'var(--gray-11)',
+            marginLeft: '4px',
+            marginBottom: '3px',
+          }}
+        >
+          {message.user_name}
+        </Text>
+      )}
+      <Box
+        style={{
+          backgroundColor: isCurrentUser ? 'var(--accent-9)' : 'var(--color-background-message)',
+          color: isCurrentUser ? 'white' : 'var(--gray-12)',
+          padding: '4px 12px 6px 12px',
+          borderRadius: '18px',
+          position: 'relative',
+          maxWidth: 'fit-content',
+          boxShadow: 'var(--shadow-message)',
+        }}
+      >
+        <Text size="2" style={{ whiteSpace: 'pre-wrap' }}>
+          {message.content}
+        </Text>
+      </Box>
+    </Flex>
+  );
+});
+
 // MessageList component to display messages
 const MessageList = memo(
   ({ messages, username, scrollAreaRef, scrollContentRef, messagesEndRef }: MessageListProps) => {
@@ -52,59 +99,10 @@ const MessageList = memo(
                 {msg.role === 'agent' ? (
                   <AiResponse message={msg} />
                 ) : (
-                  <Flex
-                    direction="column"
-                    style={{
-                      maxWidth: '60%',
-                      marginBottom: '10px',
-                      alignItems: msg.user_name === username ? 'flex-end' : 'flex-start',
-                    }}
-                  >
-                    {msg.user_name !== username && (
-                      <Text
-                        size="1"
-                        style={{
-                          color: 'var(--gray-11)',
-                          marginLeft: '4px',
-                          marginBottom: '3px',
-                        }}
-                      >
-                        {msg.user_name}
-                      </Text>
-                    )}
-                    <Box
-                      style={{
-                        backgroundColor:
-                          msg.user_name === username
-                            ? 'var(--accent-9)'
-                            : 'var(--color-background-message)',
-                        color: msg.user_name === username ? 'white' : 'var(--gray-12)',
-                        padding: '8px 12px',
-                        borderRadius: '18px',
-                        position: 'relative',
-                        maxWidth: 'fit-content',
-                        boxShadow: 'var(--shadow-message)',
-                      }}
-                    >
-                      <Text size="2" style={{ whiteSpace: 'pre-wrap' }}>
-                        {msg.content}
-                      </Text>
-                    </Box>
-                  </Flex>
+                  <UserPrompt message={msg} isCurrentUser={msg.user_name === username} />
                 )}
               </Flex>
             ))}
-
-          {/* {isLoading && (
-            <Flex justify="center">
-              <Box className="typing-indicator">
-                <Box className="typing-dot" />
-                <Box className="typing-dot" />
-                <Box className="typing-dot" />
-              </Box>
-            </Flex>
-          )} */}
-
           <div ref={messagesEndRef} />
         </Box>
       </ScrollArea>
@@ -115,6 +113,7 @@ const MessageList = memo(
 // MessageInput component for the form
 const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
   const [message, setMessage] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +122,20 @@ const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
     onSubmit(message.trim());
     setMessage('');
   };
+
+  // Auto-resize textarea as content grows
+  const adjustTextareaHeight = () => {
+    if (!textareaRef.current) return;
+    const textarea = textareaRef.current;
+    textarea.style.height = 'auto';
+    const maxHeight = window.innerHeight * 0.2; // 20% of screen height
+    const newHeight = Math.min(textarea.scrollHeight, maxHeight);
+    textarea.style.height = `${newHeight}px`;
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [message]);
 
   return (
     <Box
@@ -133,28 +146,40 @@ const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
       }}
     >
       <form onSubmit={handleSubmit}>
-        <Flex gap="2">
-          <Box style={{ flex: 1 }}>
-            <TextField.Root
-              size="3"
-              placeholder="Type a message..."
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              disabled={isLoading}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
-                  e.preventDefault();
-                  if (message.trim() && !isLoading) {
-                    handleSubmit(e);
-                  }
+        <Box style={{ position: 'relative' }}>
+          <TextArea
+            ref={textareaRef}
+            placeholder="Type a message..."
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            disabled={isLoading}
+            style={{
+              resize: 'none',
+              minHeight: '40px',
+              maxHeight: '20vh',
+              paddingRight: '56px',
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                if (message.trim() && !isLoading) {
+                  handleSubmit(e);
                 }
-              }}
-            />
+              }
+            }}
+          />
+          <Box style={{ position: 'absolute', bottom: '10px', right: '10px', zIndex: 1 }}>
+            <IconButton
+              type="submit"
+              size="2"
+              variant="solid"
+              radius="full"
+              disabled={!message.trim() || isLoading}
+            >
+              <Send size={16} />
+            </IconButton>
           </Box>
-          <Button type="submit" size="3" disabled={!message.trim() || isLoading}>
-            Send
-          </Button>
-        </Flex>
+        </Box>
       </form>
     </Box>
   );

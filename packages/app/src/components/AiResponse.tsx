@@ -6,8 +6,79 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme } from './ThemeProvider';
 import { abortMessage } from '../api';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Loader, OctagonX } from 'lucide-react';
+
+interface StopButtonProps {
+  onStop: () => void;
+  isAborting?: boolean;
+}
+
+function StopButton({ onStop, isAborting = false }: StopButtonProps) {
+  return (
+    <>
+      <Box
+        position="sticky"
+        style={{
+          top: '12px',
+          left: '100%',
+          marginLeft: '12px',
+          zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+          float: 'right',
+        }}
+        className="stop-button-container"
+      >
+        <Tooltip content="Stop generating">
+          <IconButton
+            size="2"
+            variant="soft"
+            color="ruby"
+            onClick={onStop}
+            disabled={isAborting}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+              opacity: isAborting ? 0.7 : 1,
+              backgroundColor: 'var(--color-background)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            }}
+            className="stop-button"
+          >
+            {isAborting ? (
+              <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <OctagonX size={18} />
+            )}
+          </IconButton>
+        </Tooltip>
+      </Box>
+      <style>
+        {`
+          @media (max-width: 900px) {
+            .stop-button-container {
+              position: absolute !important;
+              right: 24px !important;
+              left: auto !important;
+              margin-left: 0 !important;
+            }
+          }
+          .stop-button:hover {
+            background-color: var(--ruby-3) !important;
+            transform: scale(1.05);
+          }
+        `}
+      </style>
+    </>
+  );
+}
 
 function MarkdownMessage({ content }: { content: string }) {
   const { theme } = useTheme();
@@ -124,7 +195,7 @@ function MarkdownMessage({ content }: { content: string }) {
   );
 }
 
-export default function AiResponse({ message }: { message: Message }) {
+const AiResponse = memo(({ message }: { message: Message }) => {
   if (message.status === 'completed') {
     return <CompletedMessage message={message} />;
   } else if (message.status === 'pending') {
@@ -134,7 +205,7 @@ export default function AiResponse({ message }: { message: Message }) {
   } else {
     return <FailedMessage message={message} />;
   }
-}
+});
 
 function CompletedMessage({ message }: { message: Message }) {
   return <MarkdownMessage content={message.content} />;
@@ -177,7 +248,14 @@ function PendingMessage({ message }: { message: Message }) {
   const showThinking = !tokenText || Date.now() - lastUpdateTime > 500;
 
   return (
-    <Box position="relative" width="100%">
+    <Box
+      position="relative"
+      style={{
+        width: 'min(100%, 800px)',
+        isolation: 'isolate',
+      }}
+    >
+      <StopButton onStop={handleAbort} isAborting={isAborting} />
       <MarkdownMessage content={tokenText || ''} />
       {showThinking && (
         <Box px="6" style={{ marginTop: '0.5em' }}>
@@ -192,34 +270,16 @@ function PendingMessage({ message }: { message: Message }) {
           </Text>
         </Box>
       )}
-      <Box position="absolute" top="0" right="6" style={{ zIndex: 100, top: '-10px' }}>
-        <Tooltip content="Stop generating">
-          <IconButton
-            size="1"
-            variant="ghost"
-            color="ruby"
-            onClick={handleAbort}
-            disabled={isAborting}
-            style={{
-              padding: '0',
-              width: '28px',
-              height: '28px',
-            }}
-          >
-            {isAborting ? (
-              <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
-            ) : (
-              <OctagonX size={14} />
-            )}
-          </IconButton>
-        </Tooltip>
-      </Box>
       <style>
         {`
           @keyframes pulse {
             0% { opacity: 0.5; }
             50% { opacity: 1; }
             100% { opacity: 0.5; }
+          }
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
           }
         `}
       </style>
@@ -229,8 +289,23 @@ function PendingMessage({ message }: { message: Message }) {
 
 function FailedMessage({}: { message: Message }) {
   return (
-    <Box px="6" width="100%">
-      <Text color="ruby">Failed to generate response</Text>
+    <Box
+      px="6"
+      style={{
+        width: 'min(100%, 800px)',
+      }}
+    >
+      <Flex justify="start">
+        <div
+          style={{
+            width: '100%',
+            fontSize: 'var(--font-size-2)',
+            color: 'var(--ruby-9)',
+          }}
+        >
+          Failed to generate response
+        </div>
+      </Flex>
     </Box>
   );
 }
@@ -247,3 +322,5 @@ function AbortedMessage({ message }: { message: Message }) {
     </Box>
   );
 }
+
+export default AiResponse;

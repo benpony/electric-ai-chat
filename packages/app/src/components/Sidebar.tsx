@@ -1,15 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useMatchRoute } from '@tanstack/react-router';
-import {
-  Box,
-  Flex,
-  Text,
-  IconButton,
-  Button,
-  ScrollArea,
-  Tooltip,
-  Separator,
-} from '@radix-ui/themes';
+import { Box, Flex, Text, IconButton, Button, ScrollArea, Tooltip } from '@radix-ui/themes';
 import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useChatsShape } from '../shapes';
@@ -40,6 +31,7 @@ function ChatButton({ chat, isActive, onClick }: ChatButtonProps) {
         height: '22px',
         backgroundColor: isActive ? 'var(--gray-5)' : undefined,
         overflow: 'hidden',
+        color: 'var(--black)',
       }}
       onClick={() => onClick(chat.id)}
     >
@@ -119,8 +111,7 @@ type FooterProps = {
 
 function SidebarFooter({ username, theme, setTheme, handleLogout }: FooterProps) {
   return (
-    <Box p="2" style={{ marginTop: 'auto' }}>
-      <Separator size="4" mb="2" />
+    <Box p="2" style={{ marginTop: 'auto', borderTop: '1px solid var(--gray-5)' }}>
       <Flex align="center" justify="between" style={{ padding: '0 8px' }}>
         <Flex align="center" gap="2">
           <Text size="1">{username}</Text>

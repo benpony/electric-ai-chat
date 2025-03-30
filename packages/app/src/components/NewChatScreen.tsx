@@ -26,6 +26,20 @@ export default function NewChatScreen() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    // Add global styles for textarea scrollbar
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .textarea-with-button .rt-TextAreaInput {
+        padding-right: 56px !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -90,7 +104,7 @@ export default function NewChatScreen() {
         }}
       >
         <Box width="100%" mb="6" style={{ maxWidth: '800px' }}>
-          <Heading align="center" size="5">
+          <Heading align="center" size="5" weight="medium">
             Start a New Chat
           </Heading>
         </Box>
@@ -99,37 +113,39 @@ export default function NewChatScreen() {
           onSubmit={handleSubmit}
           style={{ width: '100%', maxWidth: '800px', position: 'relative' }}
         >
-          <TextArea
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
-            placeholder="Type a message to start a chat..."
-            size="3"
-            style={{
-              height: '240px',
-              width: '100%',
-              paddingRight: '56px',
-              resize: 'none',
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
-                e.preventDefault();
-                if (prompt.trim()) {
-                  handleSubmit(e);
+          <Box className="textarea-with-button" style={{ position: 'relative' }}>
+            <TextArea
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              placeholder="Type a message to start a chat..."
+              size="3"
+              style={{
+                height: '240px',
+                width: '100%',
+                resize: 'none',
+                ['--scrollarea-scrollbar-vertical-margin-right' as string]: '56px',
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                  e.preventDefault();
+                  if (prompt.trim()) {
+                    handleSubmit(e);
+                  }
                 }
-              }
-            }}
-          />
+              }}
+            />
 
-          <Box style={{ position: 'absolute', bottom: '12px', right: '12px' }}>
-            <IconButton
-              type="submit"
-              size="2"
-              variant="solid"
-              radius="full"
-              disabled={!prompt.trim() || isLoading}
-            >
-              <Send size={16} />
-            </IconButton>
+            <Box style={{ position: 'absolute', bottom: '12px', right: '12px', zIndex: 1 }}>
+              <IconButton
+                type="submit"
+                size="2"
+                variant="solid"
+                radius="full"
+                disabled={!prompt.trim() || isLoading}
+              >
+                <Send size={16} />
+              </IconButton>
+            </Box>
           </Box>
         </form>
       </Flex>
