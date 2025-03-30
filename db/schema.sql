@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT,
     user_name TEXT,
     role message_role,
-    status message_status
+    status message_status,
+    thinking_text TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS tokens (

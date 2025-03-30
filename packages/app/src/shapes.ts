@@ -113,6 +113,7 @@ export interface Message extends MessageRow {
   role: string;
   status: string;
   created_at: Date;
+  thinking_text: string;
 }
 
 export function messagesShapeConfig(chatId: string): ShapeOptions<Message> {

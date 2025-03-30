@@ -19,6 +19,7 @@ type Message = {
   created_at: Date;
   chat_id: string;
   status: string;
+  thinking_text: string;
 };
 
 interface MessageListProps {
@@ -204,7 +205,7 @@ export default function ChatScreen() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const scrollContentRef = useRef<HTMLDivElement>(null);
-  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
   const username = localStorage.getItem('username') || 'User';
   const { toggleSidebar } = useSidebar();
   const { toggleChatSidebar, isChatSidebarOpen } = useChatSidebar();
@@ -287,7 +288,7 @@ export default function ChatScreen() {
   }, [shouldScrollToBottom]);
 
   useEffect(() => {
-    // Scroll to bottom on initial load and when messages change, if shouldScrollToBottom is true
+    // Scroll to bottom only when messages change and shouldScrollToBottom is true
     if (shouldScrollToBottom && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }

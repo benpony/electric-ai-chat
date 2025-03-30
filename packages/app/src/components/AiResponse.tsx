@@ -313,7 +313,7 @@ function PendingMessage({ message }: { message: Message }) {
               animation: 'pulse 1.5s ease-in-out infinite',
             }}
           >
-            Thinking...
+            {message.thinking_text || 'Thinking...'}
           </Text>
         </Box>
       )}
