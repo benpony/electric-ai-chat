@@ -79,7 +79,7 @@ export default function WelcomeScreen() {
           }}
         >
           <Heading size="6" mb="5" align="center" weight="medium">
-            Welcome to Electric Chat
+            Welcome to Electric AI Chat
           </Heading>
 
           <form onSubmit={handleSubmit} style={{ width: '100%' }}>

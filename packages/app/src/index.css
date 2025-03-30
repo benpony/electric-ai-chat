@@ -68,10 +68,20 @@ body,
   padding: 0;
   overflow: hidden;
   font-family:
+    'Open Sauce One',
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
     sans-serif;
+}
+
+/* Radix Themes font overrides */
+.radix-themes {
+  --default-font-family: 'Open Sauce One', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --heading-font-family: 'Open Sauce One', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --strong-font-family: 'Open Sauce One', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --em-font-family: 'Open Sauce One', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --quote-font-family: 'Open Sauce One', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 body {

@@ -71,7 +71,7 @@ function SidebarHeader({ isMobile, handleNewChat, setSidebarOpen }: HeaderProps)
       }}
     >
       <Text size="3" weight="medium" style={{ paddingLeft: '4px' }}>
-        Electric Chat
+        Electric AI Chat
       </Text>
       {!isMobile && (
         <Tooltip content="New Chat">
