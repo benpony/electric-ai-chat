@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { useParams } from '@tanstack/react-router';
-import { Box, Flex, Text, IconButton, ScrollArea, TextArea } from '@radix-ui/themes';
-import { Menu, Send } from 'lucide-react';
+import { Box, Flex, Text, IconButton, ScrollArea, TextArea, Tooltip } from '@radix-ui/themes';
+import { Menu, Send, FileText } from 'lucide-react';
 import { useSidebar } from './SidebarProvider';
-import { useChat, useMessagesShape } from '../shapes';
+import { useChatSidebar } from './ChatSidebarProvider';
+import { useChat, useMessagesShape, useFilesShape } from '../shapes';
 import { addMessage } from '../api';
 import AiResponse from './AiResponse';
+import { ChatSidebar } from './ChatSidebar';
 
 type Message = {
   id: string;
@@ -197,6 +199,9 @@ export default function ChatScreen() {
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
   const username = localStorage.getItem('username') || 'User';
   const { toggleSidebar } = useSidebar();
+  const { toggleChatSidebar, isChatSidebarOpen } = useChatSidebar();
+  const { data: files } = useFilesShape(chatId);
+  const hasFiles = files && files.length > 0;
 
   // Define CSS variables for theming that will adapt to dark mode
   const themeVariables = {
@@ -330,16 +335,39 @@ export default function ChatScreen() {
             {chat.name}
           </Text>
         </Flex>
+        {/* Only show toggle button if there are files */}
+        {hasFiles && (
+          <Tooltip content="Chat Assets">
+            <IconButton
+              variant="ghost"
+              size="1"
+              onClick={toggleChatSidebar}
+              style={{
+                opacity: isChatSidebarOpen ? 1 : 0.5,
+              }}
+            >
+              <FileText size={18} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Flex>
 
-      {/* Messages - Scrollable */}
-      <MessageList
-        messages={messages}
-        username={username}
-        scrollAreaRef={scrollAreaRef}
-        scrollContentRef={scrollContentRef}
-        messagesEndRef={messagesEndRef}
-      />
+      {/* Main content area */}
+      <Flex style={{ flex: 1, overflow: 'hidden' }}>
+        {/* Messages - Scrollable */}
+        <Box style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
+          <MessageList
+            messages={messages}
+            username={username}
+            scrollAreaRef={scrollAreaRef}
+            scrollContentRef={scrollContentRef}
+            messagesEndRef={messagesEndRef}
+          />
+        </Box>
+
+        {/* Chat Sidebar */}
+        {hasFiles && <ChatSidebar chatId={chatId} isMobile={isMobile} />}
+      </Flex>
 
       {/* Message Input - Fixed */}
       <MessageInput onSubmit={handleMessageSubmit} isLoading={isLoading} />

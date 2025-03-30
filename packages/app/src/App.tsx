@@ -14,6 +14,7 @@ import NewChatScreen from './components/NewChatScreen';
 import ChatScreen from './components/ChatScreen';
 import Sidebar from './components/Sidebar';
 import { preloadChats } from './shapes';
+import { ChatSidebarProvider } from './components/ChatSidebarProvider';
 
 // Define the root route
 const rootRoute = createRootRoute({
@@ -103,7 +104,11 @@ const welcomeRoute = createRoute({
 const chatRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/chat/$chatId',
-  component: ChatScreen,
+  component: () => (
+    <ChatSidebarProvider>
+      <ChatScreen />
+    </ChatSidebarProvider>
+  ),
 });
 
 // Create the router
@@ -121,4 +126,5 @@ declare module '@tanstack/react-router' {
 function App() {
   return <RouterProvider router={router} />;
 }
+
 export default App;

@@ -4,7 +4,6 @@ import { Box, Flex, Text, IconButton, Button, ScrollArea, Tooltip } from '@radix
 import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useChatsShape } from '../shapes';
-import { FileList } from './FileList';
 import { useSidebar } from './SidebarProvider';
 
 // Chat Button Component
@@ -258,9 +257,6 @@ export default function Sidebar() {
         {/* Chats */}
         <ScrollArea>
           <div className="sidebar-content">
-            {/* Files Section for Active Chat */}
-            {currentChatId && <FileList chatId={currentChatId} />}
-
             <Flex direction="column" gap="1" px="4">
               {/* Pinned Chats Section */}
               {pinnedChats.length > 0 && (

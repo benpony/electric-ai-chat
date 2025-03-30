@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { ThemeProvider } from './ThemeProvider';
 import { SidebarProvider } from './SidebarProvider';
+import { ChatSidebarProvider } from './ChatSidebarProvider';
 
 type ProvidersProps = {
   children: ReactNode;
@@ -10,7 +11,9 @@ type ProvidersProps = {
 export function Providers({ children, defaultTheme = 'light' }: ProvidersProps) {
   return (
     <ThemeProvider defaultTheme={defaultTheme}>
-      <SidebarProvider>{children}</SidebarProvider>
+      <SidebarProvider>
+        <ChatSidebarProvider>{children}</ChatSidebarProvider>
+      </SidebarProvider>
     </ThemeProvider>
   );
 }
