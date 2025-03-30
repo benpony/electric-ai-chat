@@ -80,7 +80,7 @@ function StopButton({ onStop, isAborting = false }: StopButtonProps) {
   );
 }
 
-function CopyButton({ content }: { content: string }) {
+const CopyButton = memo(function CopyButton({ content }: { content: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -112,9 +112,17 @@ function CopyButton({ content }: { content: string }) {
       </IconButton>
     </Tooltip>
   );
+});
+
+interface CodeHighlighterProps {
+  children: string;
+  language: string;
 }
 
-function CodeHighlighter({ children, language }: { children: string; language: string }) {
+const CodeHighlighter = memo(function CodeHighlighter({
+  children,
+  language,
+}: CodeHighlighterProps) {
   const { theme } = useTheme();
   const syntaxTheme = theme === 'dark' ? vscDarkPlus : oneLight;
 
@@ -128,9 +136,42 @@ function CodeHighlighter({ children, language }: { children: string; language: s
       {children}
     </SyntaxHighlighter>
   );
-}
+});
 
-function MarkdownMessage({ content }: { content: string }) {
+const InlineCode = memo(function InlineCode({ children, ...props }: { children: React.ReactNode }) {
+  return (
+    <code
+      style={{
+        backgroundColor: 'var(--gray-3)',
+        padding: '0.2em 0.4em',
+        borderRadius: '3px',
+        fontSize: '85%',
+        fontFamily: 'monospace',
+      }}
+      {...props}
+    >
+      {children}
+    </code>
+  );
+});
+
+const CodeBlock = memo(function CodeBlock({
+  children,
+  language,
+}: {
+  children: React.ReactNode;
+  language: string;
+}) {
+  const content = String(children).replace(/\n$/, '');
+  return (
+    <>
+      <CopyButton content={content} />
+      <CodeHighlighter language={language}>{content}</CodeHighlighter>
+    </>
+  );
+});
+
+const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: string }) {
   return (
     <Box
       px="6"
@@ -173,25 +214,9 @@ function MarkdownMessage({ content }: { content: string }) {
                 const isInline = !className;
 
                 return isInline ? (
-                  <code
-                    style={{
-                      backgroundColor: 'var(--gray-3)',
-                      padding: '0.2em 0.4em',
-                      borderRadius: '3px',
-                      fontSize: '85%',
-                      fontFamily: 'monospace',
-                    }}
-                    {...props}
-                  >
-                    {children}
-                  </code>
+                  <InlineCode {...props}>{children}</InlineCode>
                 ) : (
-                  <>
-                    <CopyButton content={String(children).replace(/\n$/, '')} />
-                    <CodeHighlighter language={language}>
-                      {String(children).replace(/\n$/, '')}
-                    </CodeHighlighter>
-                  </>
+                  <CodeBlock language={language}>{children}</CodeBlock>
                 );
               },
               a: ({ children, ...props }) => (
@@ -240,7 +265,7 @@ function MarkdownMessage({ content }: { content: string }) {
       </Flex>
     </Box>
   );
-}
+});
 
 const AiResponse = memo(({ message }: { message: Message }) => {
   if (message.status === 'completed') {
