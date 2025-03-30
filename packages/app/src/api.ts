@@ -17,12 +17,22 @@ export interface Chat {
 export interface CreateChatRequest {
   message: string;
   user: string;
-  id?: string; // Client-provided UUID
+  id?: string;
+  dbUrl?: {
+    redactedUrl: string;
+    redactedId: string;
+    password: string;
+  };
 }
 
 export interface CreateMessageRequest {
   message: string;
   user: string;
+  dbUrl?: {
+    redactedUrl: string;
+    redactedId: string;
+    password: string;
+  };
 }
 
 // API client
@@ -31,8 +41,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 /**
  * Create a new chat with an initial message
  */
-export async function createChat(message: string, user: string, id?: string): Promise<Chat> {
-  const payload: CreateChatRequest = { message, user, id };
+export async function createChat(
+  message: string,
+  user: string,
+  id?: string,
+  dbUrl?: { redactedUrl: string; redactedId: string; password: string }
+): Promise<Chat> {
+  const payload: CreateChatRequest = { message, user, id, dbUrl };
 
   const response = await fetch(`${API_URL}/api/chats`, {
     method: 'POST',
@@ -55,11 +70,12 @@ export async function createChat(message: string, user: string, id?: string): Pr
  * Add a message to an existing chat
  */
 export async function addMessage(
-  chatId: number | string,
+  chatId: string,
   message: string,
-  user: string
-): Promise<ChatMessage> {
-  const payload: CreateMessageRequest = { message, user };
+  user: string,
+  dbUrl?: { redactedUrl: string; redactedId: string; password: string }
+): Promise<{ messages: ChatMessage[] }> {
+  const payload: CreateMessageRequest = { message, user, dbUrl };
 
   const response = await fetch(`${API_URL}/api/chats/${chatId}/messages`, {
     method: 'POST',
@@ -74,8 +90,7 @@ export async function addMessage(
     throw new Error(error.error || 'Failed to add message');
   }
 
-  const data = await response.json();
-  return data.message;
+  return response.json();
 }
 
 /**

@@ -60,7 +60,7 @@ app.get('/api/chats/:id', async (c: Context) => {
 // Create a new chat
 app.post('/api/chats', async (c: Context) => {
   const body = await c.req.json();
-  const { message, user, id } = body as CreateChatRequest;
+  const { message, user, id, dbUrl } = body as CreateChatRequest;
 
   if (!message || !user) {
     return c.json({ error: 'Message and user are required' }, 400);
@@ -128,7 +128,8 @@ app.post('/api/chats', async (c: Context) => {
       ORDER BY created_at ASC
     `;
 
-    const aiMessage = await createAIResponse(chatId, messages);
+    // Make sure dbUrl has the password field required by createAIResponse
+    const aiMessage = await createAIResponse(chatId, messages, dbUrl);
 
     // Include the pending AI message in the response
     chat.messages.push(aiMessage);
@@ -144,7 +145,7 @@ app.post('/api/chats', async (c: Context) => {
 app.post('/api/chats/:id/messages', async (c: Context) => {
   const chatId = c.req.param('id');
   const body = await c.req.json();
-  const { message, user } = body as CreateMessageRequest;
+  const { message, user, dbUrl } = body as CreateMessageRequest;
 
   if (!message || !user) {
     return c.json({ error: 'Message and user are required' }, 400);
@@ -189,7 +190,7 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
     `;
 
     // Create AI response (will create a pending message and process in background)
-    const aiMessage = await createAIResponse(chatId, messages);
+    const aiMessage = await createAIResponse(chatId, messages, dbUrl);
 
     // Return both the user message and the pending AI message
     return c.json(

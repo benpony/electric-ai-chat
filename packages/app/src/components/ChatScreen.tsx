@@ -8,6 +8,7 @@ import { useChat, useMessagesShape, useFilesShape } from '../shapes';
 import { addMessage } from '../api';
 import AiResponse from './AiResponse';
 import { ChatSidebar } from './ChatSidebar';
+import { processDatabaseUrl } from '../utils/db-url';
 
 type Message = {
   id: string;
@@ -28,7 +29,10 @@ interface MessageListProps {
 }
 
 interface MessageInputProps {
-  onSubmit: (message: string) => void;
+  onSubmit: (
+    message: string,
+    dbUrl?: { redactedUrl: string; redactedId: string; password: string }
+  ) => void;
   isLoading: boolean;
 }
 
@@ -116,12 +120,15 @@ const MessageList = memo(
 const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { chatId } = useParams({ from: '/chat/$chatId' });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || isLoading) return;
 
-    onSubmit(message.trim());
+    // Process any database URL in the message
+    const { message: processedMessage, dbUrl } = processDatabaseUrl(message, chatId);
+    onSubmit(processedMessage, dbUrl);
     setMessage('');
   };
 
@@ -285,12 +292,15 @@ export default function ChatScreen() {
     }
   }, [messages, shouldScrollToBottom]);
 
-  const handleMessageSubmit = async (messageText: string) => {
+  const handleMessageSubmit = async (
+    messageText: string,
+    dbUrl?: { redactedUrl: string; redactedId: string; password: string }
+  ) => {
     try {
       setIsLoading(true);
 
       // Send message to API
-      await addMessage(chatId, messageText, username);
+      await addMessage(chatId, messageText, username, dbUrl);
 
       // Force scroll to bottom when user sends a message
       setShouldScrollToBottom(true);

@@ -7,6 +7,7 @@ import { useSidebar } from './SidebarProvider';
 import { createChat } from '../api';
 import { useChatsShape, preloadMessages } from '../shapes';
 import { v4 as uuidv4 } from 'uuid';
+import { processDatabaseUrl } from '../utils/db-url';
 
 export default function NewChatScreen() {
   const [prompt, setPrompt] = useState('');
@@ -51,6 +52,9 @@ export default function NewChatScreen() {
       // Generate a UUID for the new chat
       const chatId = uuidv4();
 
+      // Process any database URL in the message
+      const { message: processedMessage, dbUrl } = processDatabaseUrl(prompt, chatId);
+
       // Start watching for the chat to sync BEFORE making the API call
       const matchPromise = matchStream(stream, ['insert'], message => {
         console.log('message id', message.value.id);
@@ -58,7 +62,7 @@ export default function NewChatScreen() {
       });
 
       // Create a new chat via API with the pre-generated UUID
-      await createChat(prompt.trim(), username, chatId);
+      await createChat(processedMessage, username, chatId, dbUrl);
 
       // Wait for the chat to sync
       await matchPromise;

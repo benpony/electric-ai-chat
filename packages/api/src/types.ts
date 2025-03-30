@@ -6,6 +6,11 @@ export interface ChatMessage {
   role: 'user' | 'agent';
   status: 'pending' | 'completed' | 'failed' | 'aborted';
   created_at: Date;
+  dbUrl?: {
+    redactedUrl: string;
+    redactedId: string;
+    password: string;
+  };
 }
 
 export interface ToolCall {
@@ -37,9 +42,19 @@ export interface CreateChatRequest {
   message: string;
   user: string;
   id?: string; // Optional client-provided ID
+  dbUrl?: {
+    redactedUrl: string;
+    redactedId: string;
+    password: string;
+  };
 }
 
 export interface CreateMessageRequest {
   message: string;
   user: string;
+  dbUrl?: {
+    redactedUrl: string;
+    redactedId: string;
+    password: string;
+  };
 }

@@ -21,6 +21,7 @@ import {
   renameFile,
   readFile,
 } from './tools/files.js';
+import { getDatabaseSchema, postgresTools } from './tools/postgres.js';
 import { processStreamChunks } from './stream.js';
 import { model } from '../utils.js';
 
@@ -33,7 +34,11 @@ const openai = new OpenAI({
 });
 
 // Helper function to create AI response
-export async function createAIResponse(chatId: string, contextRows: any[]) {
+export async function createAIResponse(
+  chatId: string,
+  contextRows: any[],
+  dbUrl?: { redactedUrl: string; redactedId: string; password: string }
+) {
   try {
     // Convert rows to ChatMessage objects and limit context size
     const context = contextRows.map(rowToChatMessage);
@@ -49,7 +54,7 @@ export async function createAIResponse(chatId: string, contextRows: any[]) {
     `;
 
     // Start streaming in background
-    processAIStream(chatId, messageId, limitedContext).catch(error => {
+    processAIStream(chatId, messageId, limitedContext, dbUrl).catch(error => {
       console.error('Error in AI streaming:', error);
       // Update message to failed status if there's an error
       db`
@@ -102,7 +107,12 @@ function limitContextSize(messages: ChatMessage[]): ChatMessage[] {
 }
 
 // Process AI stream in background
-async function processAIStream(chatId: string, messageId: string, context: ChatMessage[]) {
+async function processAIStream(
+  chatId: string,
+  messageId: string,
+  context: ChatMessage[],
+  dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+) {
   // This abort controller is used to abort the message stream but also to
   // cancel the OpenAI stream when the message is aborted.
   const abortController = new AbortController();
@@ -199,7 +209,7 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
   let lastInsertTime = Date.now();
 
   // Combine all tools
-  const tools = [...basicTools, ...electricTools, ...fileTools];
+  const tools = [...basicTools, ...electricTools, ...fileTools, ...postgresTools];
 
   try {
     // Call OpenAI with streaming
@@ -300,6 +310,57 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
             lastInsertTime = result.lastInsertTime;
             continue; // Skip the rest of the tool calls since we've handled this one
           }
+        } else if (toolCall.function.name === 'get_database_schema') {
+          console.log('Tool call arguments:', args);
+
+          if (!dbUrlParam) {
+            console.log('No database URL provided in the request');
+            const response =
+              '\n\nI need a database URL to get the schema. Please provide one in your message.';
+            fullContent += response;
+            tokenBuffer += response;
+            continue;
+          }
+
+          console.log('Using database URL from request params');
+          console.log('Database URL info:', {
+            redactedUrl: dbUrlParam.redactedUrl,
+            redactedId: dbUrlParam.redactedId,
+            passwordLength: dbUrlParam.password.length,
+          });
+
+          // Get the schema from the database
+          const schema = await getDatabaseSchema(args.redactedUrl, dbUrlParam.password);
+
+          // Instead of outputting directly, add the schema as context and continue the conversation
+          messages.push({
+            role: 'system',
+            content: `Here's the database schema information:\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`\nPlease use this information to answer the user's question about the database schema.`,
+          } as ChatCompletionSystemMessageParam);
+
+          // Get a new completion with the updated context
+          const completion = await openai.chat.completions.create({
+            model,
+            messages,
+            stream: true,
+            tools,
+            tool_choice: 'auto',
+            max_tokens: 4000, // Limit response size
+          });
+
+          // Process the new stream
+          const result = await processStreamChunks(
+            completion,
+            messageId,
+            tokenNumber,
+            tokenBuffer,
+            lastInsertTime
+          );
+          fullContent += result.fullContent;
+          tokenNumber = result.tokenNumber;
+          tokenBuffer = result.tokenBuffer;
+          lastInsertTime = result.lastInsertTime;
+          continue; // Skip the rest of the tool calls since we've handled this one
         } else if (toolCall.function.name === 'create_file') {
           const result = await createFile(chatId, args.path, args.mime_type, args.content);
           const response = result.success
@@ -358,49 +419,27 @@ async function processAIStream(chatId: string, messageId: string, context: ChatM
             tokenBuffer += response;
           }
         }
-
-        // Insert tokens if buffer is full or enough time has passed
-        const currentTime = Date.now();
-        if (currentTime - lastInsertTime >= 60 || tokenBuffer.length > 0) {
-          console.log('inserting tokens (1)', tokenBuffer);
-          await db`
-            INSERT INTO tokens (message_id, token_number, token_text)
-            VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
-          `;
-          tokenNumber++;
-          tokenBuffer = '';
-          lastInsertTime = currentTime;
-        }
-      } catch (err) {
-        console.error('Error processing tool call:', err);
+      } catch (error) {
+        console.error('Error processing tool call:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        fullContent += `\n\nError processing tool call: ${errorMessage}`;
+        tokenBuffer += `\n\nError processing tool call: ${errorMessage}`;
       }
     }
-
-    // Insert any remaining tokens in the buffer
-    if (tokenBuffer) {
-      await db`
-        INSERT INTO tokens (message_id, token_number, token_text)
-        VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
-      `;
-    }
-
-    // Update the message with the complete content
-    await db`
-      UPDATE messages
-      SET content = ${fullContent}, status = ${abortController.signal.aborted ? 'aborted' : 'completed'}
-      WHERE id = ${messageId}
-    `;
   } catch (error) {
-    console.error('Error in AI streaming:', error);
-    // Update message to failed status with error details
+    console.error('Error processing AI stream:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    await db`
-      UPDATE messages
-      SET status = 'failed', content = ${`Failed to generate response: ${errorMessage}`}
-      WHERE id = ${messageId}
-    `;
+    fullContent += `\n\nError processing AI stream: ${errorMessage}`;
+    tokenBuffer += `\n\nError processing AI stream: ${errorMessage}`;
   }
 
-  // Abort the message stream
-  abortController.abort();
+  // Update the message with the processed content
+  await db`
+    UPDATE messages
+    SET status = 'completed', content = ${fullContent}
+    WHERE id = ${messageId}
+  `;
+
+  // Delete tokens
+  await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
 }
