@@ -106,6 +106,175 @@ function limitContextSize(messages: ChatMessage[]): ChatMessage[] {
   return limitedMessages;
 }
 
+// Process each tool call and return the result
+async function processToolCall(
+  toolCall: ToolCall,
+  chatId: string,
+  dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+): Promise<{
+  content: string;
+  systemMessage?: string;
+  requiresReentry?: boolean;
+}> {
+  try {
+    const args = JSON.parse(toolCall.function.arguments);
+    console.log('Processing tool call:', toolCall.function.name, args);
+
+    switch (toolCall.function.name) {
+      case 'fetch_electric_docs': {
+        // Add the chatId to the set of ElectricSQL chats
+        electricChats.add(chatId);
+        const docs = await fetchElectricDocs();
+        if (docs) {
+          return {
+            content: '',
+            systemMessage: `Here's the relevant ElectricSQL documentation for "${args.query}":\n${docs}`,
+            requiresReentry: true,
+          };
+        }
+        return { content: '\n\nFailed to fetch ElectricSQL documentation.' };
+      }
+
+      case 'get_database_schema': {
+        if (!dbUrlParam) {
+          return {
+            content:
+              '\n\nI need a database URL to get the schema. Please provide one in your message.',
+          };
+        }
+
+        // Get the schema from the database
+        const schema = await getDatabaseSchema(args.redactedUrl, dbUrlParam.password);
+        return {
+          content: '',
+          systemMessage: `Here's the database schema information:\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`\nPlease use this information to answer the user's question about the database schema.`,
+          requiresReentry: true,
+        };
+      }
+
+      case 'execute_postgres_query': {
+        if (!dbUrlParam) {
+          return {
+            content:
+              '\n\nI need a database URL to execute queries. Please provide one in your message.',
+          };
+        }
+
+        try {
+          // Execute the query in read-only mode
+          const results = await executeReadOnlyQuery(
+            args.redactedUrl,
+            dbUrlParam.password,
+            args.query
+          );
+
+          // Format results for better display
+          const formattedResults = JSON.stringify(results, null, 2);
+          return {
+            content: '',
+            systemMessage: `Here are the results of your SQL query:\n\`\`\`json\n${formattedResults}\n\`\`\`\nPlease use these results to answer the user's question.`,
+            requiresReentry: true,
+          };
+        } catch (error) {
+          console.error('Error executing query:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          return { content: `\n\nError executing query: ${errorMessage}` };
+        }
+      }
+
+      case 'create_file': {
+        const result = await createFile(chatId, args.path, args.mime_type, args.content);
+        return {
+          content: '',
+          systemMessage: result.success
+            ? `I've created the file "${args.path}" with the following content:\n\`\`\`\n${args.content}\n\`\`\`\nPlease continue the conversation with this information.`
+            : `I was unable to create file "${args.path}". Error: ${result.error}\nPlease continue the conversation with this information.`,
+          requiresReentry: true,
+        };
+      }
+
+      case 'edit_file': {
+        const result = await editFile(chatId, args.path, args.content);
+        return {
+          content: '',
+          systemMessage: result.success
+            ? `I've updated the file "${args.path}" with the following content:\n\`\`\`\n${args.content}\n\`\`\`\nPlease continue the conversation with this information.`
+            : `I was unable to update file "${args.path}". Error: ${result.error}\nPlease continue the conversation with this information.`,
+          requiresReentry: true,
+        };
+      }
+
+      case 'delete_file': {
+        const result = await deleteFile(chatId, args.path);
+        return {
+          content: '',
+          systemMessage: result.success
+            ? `I've successfully deleted the file "${args.path}". Please continue the conversation with this information.`
+            : `I was unable to delete file "${args.path}". Error: ${result.error}\nPlease continue the conversation with this information.`,
+          requiresReentry: true,
+        };
+      }
+
+      case 'rename_file': {
+        const result = await renameFile(chatId, args.old_path, args.new_path);
+        return {
+          content: '',
+          systemMessage: result.success
+            ? `I've successfully renamed "${args.old_path}" to "${args.new_path}". Please continue the conversation with this information.`
+            : `I was unable to rename file from "${args.old_path}" to "${args.new_path}". Error: ${result.error}\nPlease continue the conversation with this information.`,
+          requiresReentry: true,
+        };
+      }
+
+      case 'read_file': {
+        const result = await readFile(chatId, args.path);
+        return {
+          content: '',
+          systemMessage:
+            result.success && result.file
+              ? `Here's the contents of "${args.path}":\n\`\`\`\n${result.file.content}\n\`\`\`\nPlease continue the conversation with this information.`
+              : `I was unable to read file "${args.path}". Error: ${result.error}\nPlease continue the conversation with this information.`,
+          requiresReentry: true,
+        };
+      }
+
+      case 'rename_chat': {
+        const newName = await renameChat(chatId, args.context);
+        return {
+          content: newName
+            ? `\n\nI've renamed this chat to: "${newName}"`
+            : '\n\nFailed to rename chat.',
+        };
+      }
+
+      case 'rename_chat_to': {
+        const newName = await renameChatTo(chatId, args.name);
+        return {
+          content: newName
+            ? `\n\nI've renamed this chat to: "${newName}"`
+            : '\n\nFailed to rename chat.',
+        };
+      }
+
+      case 'pin_chat': {
+        const success = await pinChat(chatId, args.pinned);
+        return {
+          content: success
+            ? `\n\nI've ${args.pinned ? 'pinned' : 'unpinned'} this chat.`
+            : '\n\nFailed to update pin status.',
+        };
+      }
+
+      default:
+        return { content: `\n\nUnsupported tool call: ${toolCall.function.name}` };
+    }
+  } catch (error) {
+    console.error('Error processing tool call:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return { content: `\n\nError processing tool call: ${errorMessage}` };
+  }
+}
+
 // Process AI stream in background
 async function processAIStream(
   chatId: string,
@@ -269,224 +438,45 @@ async function processAIStream(
 
     // Process any tool calls
     for (const toolCall of toolCalls) {
-      try {
-        const args = JSON.parse(toolCall.function.arguments);
+      const result = await processToolCall(toolCall, chatId, dbUrlParam);
 
-        console.log('toolCall', toolCall);
+      // Add any direct content to the response
+      if (result.content) {
+        fullContent += result.content;
+        tokenBuffer += result.content;
+      }
 
-        if (toolCall.function.name === 'fetch_electric_docs') {
-          console.log('fetch_electric_docs', args);
-          // Add the chatId to the set of ElectricSQL chats
-          electricChats.add(chatId);
-          const docs = await fetchElectricDocs();
-          if (docs) {
-            // Add the docs as a system message and continue the conversation
-            messages.push({
-              role: 'system',
-              content: `Here's the relevant ElectricSQL documentation for "${args.query}":\n${docs}`,
-            } as ChatCompletionSystemMessageParam);
+      // If the tool requires re-entry into the stream with context
+      if (result.requiresReentry && result.systemMessage) {
+        // Add the context as a system message
+        messages.push({
+          role: 'system',
+          content: result.systemMessage,
+        } as ChatCompletionSystemMessageParam);
 
-            // Get a new completion with the updated context
-            const completion = await openai.chat.completions.create({
-              model,
-              messages,
-              stream: true,
-              tools,
-              tool_choice: 'auto',
-              max_tokens: 4000, // Limit response size
-            });
+        // Get a new completion with the updated context
+        const completion = await openai.chat.completions.create({
+          model,
+          messages,
+          stream: true,
+          tools,
+          tool_choice: 'auto',
+          max_tokens: 4000, // Limit response size
+        });
 
-            // Process the new stream
-            const result = await processStreamChunks(
-              completion,
-              messageId,
-              tokenNumber,
-              tokenBuffer,
-              lastInsertTime
-            );
-            fullContent += result.fullContent;
-            tokenNumber = result.tokenNumber;
-            tokenBuffer = result.tokenBuffer;
-            lastInsertTime = result.lastInsertTime;
-            continue; // Skip the rest of the tool calls since we've handled this one
-          }
-        } else if (toolCall.function.name === 'get_database_schema') {
-          console.log('Tool call arguments:', args);
+        // Process the new stream
+        const streamResult = await processStreamChunks(
+          completion,
+          messageId,
+          tokenNumber,
+          tokenBuffer,
+          lastInsertTime
+        );
 
-          if (!dbUrlParam) {
-            console.log('No database URL provided in the request');
-            const response =
-              '\n\nI need a database URL to get the schema. Please provide one in your message.';
-            fullContent += response;
-            tokenBuffer += response;
-            continue;
-          }
-
-          console.log('Using database URL from request params');
-          console.log('Database URL info:', {
-            redactedUrl: dbUrlParam.redactedUrl,
-            redactedId: dbUrlParam.redactedId,
-            passwordLength: dbUrlParam.password.length,
-          });
-
-          // Get the schema from the database
-          const schema = await getDatabaseSchema(args.redactedUrl, dbUrlParam.password);
-
-          // Instead of outputting directly, add the schema as context and continue the conversation
-          messages.push({
-            role: 'system',
-            content: `Here's the database schema information:\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`\nPlease use this information to answer the user's question about the database schema.`,
-          } as ChatCompletionSystemMessageParam);
-
-          // Get a new completion with the updated context
-          const completion = await openai.chat.completions.create({
-            model,
-            messages,
-            stream: true,
-            tools,
-            tool_choice: 'auto',
-            max_tokens: 4000, // Limit response size
-          });
-
-          // Process the new stream
-          const result = await processStreamChunks(
-            completion,
-            messageId,
-            tokenNumber,
-            tokenBuffer,
-            lastInsertTime
-          );
-          fullContent += result.fullContent;
-          tokenNumber = result.tokenNumber;
-          tokenBuffer = result.tokenBuffer;
-          lastInsertTime = result.lastInsertTime;
-          continue; // Skip the rest of the tool calls since we've handled this one
-        } else if (toolCall.function.name === 'execute_postgres_query') {
-          console.log('Tool call arguments:', args);
-
-          if (!dbUrlParam) {
-            console.log('No database URL provided in the request');
-            const response =
-              '\n\nI need a database URL to execute queries. Please provide one in your message.';
-            fullContent += response;
-            tokenBuffer += response;
-            continue;
-          }
-
-          console.log('Using database URL from request params');
-          console.log('Query to execute:', args.query);
-
-          try {
-            // Execute the query in read-only mode
-            const results = await executeReadOnlyQuery(
-              args.redactedUrl,
-              dbUrlParam.password,
-              args.query
-            );
-
-            // Format results for better display
-            const formattedResults = JSON.stringify(results, null, 2);
-
-            // Instead of outputting directly, add the query results as context and continue the conversation
-            messages.push({
-              role: 'system',
-              content: `Here are the results of your SQL query:\n\`\`\`json\n${formattedResults}\n\`\`\`\nPlease use these results to answer the user's question.`,
-            } as ChatCompletionSystemMessageParam);
-
-            // Get a new completion with the updated context
-            const completion = await openai.chat.completions.create({
-              model,
-              messages,
-              stream: true,
-              tools,
-              tool_choice: 'auto',
-              max_tokens: 4000, // Limit response size
-            });
-
-            // Process the new stream
-            const result = await processStreamChunks(
-              completion,
-              messageId,
-              tokenNumber,
-              tokenBuffer,
-              lastInsertTime
-            );
-            fullContent += result.fullContent;
-            tokenNumber = result.tokenNumber;
-            tokenBuffer = result.tokenBuffer;
-            lastInsertTime = result.lastInsertTime;
-            continue; // Skip the rest of the tool calls since we've handled this one
-          } catch (error) {
-            console.error('Error executing query:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-            const response = `\n\nError executing query: ${errorMessage}`;
-            fullContent += response;
-            tokenBuffer += response;
-            continue;
-          }
-        } else if (toolCall.function.name === 'create_file') {
-          const result = await createFile(chatId, args.path, args.mime_type, args.content);
-          const response = result.success
-            ? `\n\nI've created the file "${args.path}"`
-            : `\n\nFailed to create file "${args.path}": ${result.error}`;
-          fullContent += response;
-          tokenBuffer += response;
-        } else if (toolCall.function.name === 'edit_file') {
-          const result = await editFile(chatId, args.path, args.content);
-          const response = result.success
-            ? `\n\nI've updated the file "${args.path}"`
-            : `\n\nFailed to update file "${args.path}": ${result.error}`;
-          fullContent += response;
-          tokenBuffer += response;
-        } else if (toolCall.function.name === 'delete_file') {
-          const result = await deleteFile(chatId, args.path);
-          const response = result.success
-            ? `\n\nI've deleted the file "${args.path}"`
-            : `\n\nFailed to delete file "${args.path}": ${result.error}`;
-          fullContent += response;
-          tokenBuffer += response;
-        } else if (toolCall.function.name === 'rename_file') {
-          const result = await renameFile(chatId, args.old_path, args.new_path);
-          const response = result.success
-            ? `\n\nI've renamed "${args.old_path}" to "${args.new_path}"`
-            : `\n\nFailed to rename file: ${result.error}`;
-          fullContent += response;
-          tokenBuffer += response;
-        } else if (toolCall.function.name === 'read_file') {
-          const result = await readFile(chatId, args.path);
-          const response =
-            result.success && result.file
-              ? `\n\nHere's the contents of "${args.path}":\n\`\`\`\n${result.file.content}\n\`\`\``
-              : `\n\nFailed to read file "${args.path}": ${result.error}`;
-          fullContent += response;
-          tokenBuffer += response;
-        } else if (toolCall.function.name === 'rename_chat') {
-          const newName = await renameChat(chatId, args.context);
-          if (newName) {
-            const response = `\n\nI've renamed this chat to: "${newName}"`;
-            fullContent += response;
-            tokenBuffer += response;
-          }
-        } else if (toolCall.function.name === 'rename_chat_to') {
-          const newName = await renameChatTo(chatId, args.name);
-          if (newName) {
-            const response = `\n\nI've renamed this chat to: "${newName}"`;
-            fullContent += response;
-            tokenBuffer += response;
-          }
-        } else if (toolCall.function.name === 'pin_chat') {
-          const success = await pinChat(chatId, args.pinned);
-          if (success) {
-            const response = `\n\nI've ${args.pinned ? 'pinned' : 'unpinned'} this chat.`;
-            fullContent += response;
-            tokenBuffer += response;
-          }
-        }
-      } catch (error) {
-        console.error('Error processing tool call:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        fullContent += `\n\nError processing tool call: ${errorMessage}`;
-        tokenBuffer += `\n\nError processing tool call: ${errorMessage}`;
+        fullContent += streamResult.fullContent;
+        tokenNumber = streamResult.tokenNumber;
+        tokenBuffer = streamResult.tokenBuffer;
+        lastInsertTime = streamResult.lastInsertTime;
       }
     }
   } catch (error) {
