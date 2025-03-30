@@ -1,6 +1,6 @@
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { PrismAsyncLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import vscDarkPlus from 'react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus';
+import oneLight from 'react-syntax-highlighter/dist/esm/styles/prism/one-light';
 import { useTheme } from './ThemeProvider';
 
 interface CodeBlockProps {

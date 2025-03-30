@@ -1,9 +1,9 @@
 import { Flex, Text, Box, IconButton, Tooltip } from '@radix-ui/themes';
 import { Message, useTokensShape } from '../shapes';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { PrismAsyncLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import vscDarkPlus from 'react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus';
+import oneLight from 'react-syntax-highlighter/dist/esm/styles/prism/one-light';
 import { useTheme } from './ThemeProvider';
 import { abortMessage } from '../api';
 import { useState, useEffect, memo } from 'react';
@@ -114,10 +114,23 @@ function CopyButton({ content }: { content: string }) {
   );
 }
 
-function MarkdownMessage({ content }: { content: string }) {
+function CodeHighlighter({ children, language }: { children: string; language: string }) {
   const { theme } = useTheme();
   const syntaxTheme = theme === 'dark' ? vscDarkPlus : oneLight;
 
+  return (
+    <SyntaxHighlighter
+      style={syntaxTheme}
+      language={language}
+      PreTag="div"
+      className="syntax-highlighter"
+    >
+      {children}
+    </SyntaxHighlighter>
+  );
+}
+
+function MarkdownMessage({ content }: { content: string }) {
   return (
     <Box
       px="6"
@@ -175,14 +188,9 @@ function MarkdownMessage({ content }: { content: string }) {
                 ) : (
                   <>
                     <CopyButton content={String(children).replace(/\n$/, '')} />
-                    <SyntaxHighlighter
-                      style={syntaxTheme}
-                      language={language}
-                      PreTag="div"
-                      className="syntax-highlighter"
-                    >
+                    <CodeHighlighter language={language}>
                       {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
+                    </CodeHighlighter>
                   </>
                 );
               },
