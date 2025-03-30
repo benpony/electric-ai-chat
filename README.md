@@ -11,6 +11,7 @@ This project demonstrates:
   - Chat pinning and renaming
   - Live updates of AI-generated or modified files
   - Immediate visibility of tool actions across all clients
+- Controlling the LLM process via ElectricSQL propagating the `stop` status to the agent process when a user clicks the stop button.
 
 ## Outline
 
