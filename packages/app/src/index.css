@@ -353,7 +353,7 @@ pre:has(.syntax-highlighter) {
     height: 100dvh;
     height: -webkit-fill-available;
   }
-  
+
   .sidebar {
     height: 100dvh;
     height: -webkit-fill-available;

@@ -26,6 +26,7 @@ interface FileViewerProps {
 export function FileViewer({ file, open, onOpenChange }: FileViewerProps) {
   const { theme } = useTheme();
   const [showRawMarkdown, setShowRawMarkdown] = useState(false);
+  const [showRawSvg, setShowRawSvg] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
 
   const fileName = useMemo(() => file?.path.split('/').pop() || 'file', [file?.path]);
@@ -101,6 +102,19 @@ export function FileViewer({ file, open, onOpenChange }: FileViewerProps) {
                     color="indigo"
                     highContrast={showRawMarkdown}
                     onClick={() => setShowRawMarkdown(!showRawMarkdown)}
+                  >
+                    <Code size={16} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {file.mime_type === 'image/svg+xml' && (
+                <Tooltip content={showRawSvg ? 'View rendered' : 'View raw'}>
+                  <IconButton
+                    size="1"
+                    variant="soft"
+                    color="indigo"
+                    highContrast={showRawSvg}
+                    onClick={() => setShowRawSvg(!showRawSvg)}
                   >
                     <Code size={16} />
                   </IconButton>
@@ -190,15 +204,34 @@ export function FileViewer({ file, open, onOpenChange }: FileViewerProps) {
           )}
           {isImage && (
             <Flex justify="center" p="4">
-              <img
-                src={`data:${file.mime_type};base64,${file.content}`}
-                alt={file.path}
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: 'calc(90vh - 200px)',
-                  borderRadius: '4px',
-                }}
-              />
+              {file.mime_type === 'image/svg+xml' ? (
+                showRawSvg ? (
+                  <Box>
+                    <CodeBlock code={decodeURIComponent(file.content)} language="xml" />
+                  </Box>
+                ) : (
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: decodeURIComponent(file.content),
+                    }}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: 'calc(90vh - 200px)',
+                      borderRadius: '4px',
+                    }}
+                  />
+                )
+              ) : (
+                <img
+                  src={`data:${file.mime_type};base64,${file.content}`}
+                  alt={file.path}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: 'calc(90vh - 200px)',
+                    borderRadius: '4px',
+                  }}
+                />
+              )}
             </Flex>
           )}
           {!isTextFile && !isImage && (
