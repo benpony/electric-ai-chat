@@ -13,7 +13,7 @@ import WelcomeScreen from './components/WelcomeScreen';
 import NewChatScreen from './components/NewChatScreen';
 import ChatScreen from './components/ChatScreen';
 import Sidebar from './components/Sidebar';
-import { preloadChats } from './shapes';
+import { preloadChats, preloadMessages } from './shapes';
 import { ChatSidebarProvider } from './components/ChatSidebarProvider';
 
 // Define the root route
@@ -104,6 +104,9 @@ const welcomeRoute = createRoute({
 const chatRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/chat/$chatId',
+  loader: async ({ params }) => {
+    await preloadMessages(params.chatId);
+  },
   component: () => (
     <ChatSidebarProvider>
       <ChatScreen />
