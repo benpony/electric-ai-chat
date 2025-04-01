@@ -194,3 +194,72 @@ export function useFilesShape(chatId: string) {
 export async function preloadFiles(chatId: string) {
   await preloadShape<File>(filesShapeConfig(chatId));
 }
+
+// Todo List Shape
+
+export interface TodoList extends MessageRow {
+  id: string;
+  name: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export function todoListsShapeConfig(): ShapeOptions<TodoList> {
+  return {
+    url: `${ELECTRIC_API_URL}/v1/shape`,
+    params: {
+      table: 'todo_lists',
+    },
+    parser: {
+      timestamptz: (value: string) => new Date(value),
+    },
+    signal: new AbortController().signal, // Dummy signal to ensure hashing is consistent
+  };
+}
+
+export function useTodoListsShape() {
+  return useShape(todoListsShapeConfig());
+}
+
+export async function preloadTodoLists() {
+  await preloadShape<TodoList>(todoListsShapeConfig());
+}
+
+export function useTodoList(listId: string) {
+  const { data: lists } = useTodoListsShape();
+  return lists.find(list => list.id === listId);
+}
+
+// Todo Item Shape
+
+export interface TodoItem extends MessageRow {
+  id: string;
+  list_id: string;
+  task: string;
+  done: boolean;
+  order_key: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export function todoItemsShapeConfig(listId: string): ShapeOptions<TodoItem> {
+  return {
+    url: `${ELECTRIC_API_URL}/v1/shape`,
+    params: {
+      table: 'todo_items',
+      where: `list_id = '${listId}'`,
+    },
+    parser: {
+      timestamptz: (value: string) => new Date(value),
+    },
+    signal: new AbortController().signal, // Dummy signal to ensure hashing is consistent
+  };
+}
+
+export function useTodoItemsShape(listId: string) {
+  return useShapeWithAbort(todoItemsShapeConfig(listId), 1000);
+}
+
+export async function preloadTodoItems(listId: string) {
+  await preloadShape<TodoItem>(todoItemsShapeConfig(listId));
+}

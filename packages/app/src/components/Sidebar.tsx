@@ -5,6 +5,7 @@ import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin } from 'lucide-react
 import { useTheme } from './ThemeProvider';
 import { useChatsShape } from '../shapes';
 import { useSidebar } from './SidebarProvider';
+import TodoLists from './TodoLists';
 
 // Chat Button Component
 type ChatButtonProps = {
@@ -248,54 +249,64 @@ export default function Sidebar() {
               }}
               onClick={handleNewChat}
             >
-              <MessageSquarePlus size={14} style={{ marginRight: '8px' }} />
               New Chat
             </Button>
           </Box>
         )}
 
-        {/* Chats */}
-        <ScrollArea>
-          <div className="sidebar-content">
-            <Flex direction="column" gap="1" px="4">
-              {/* Pinned Chats Section */}
-              {pinnedChats.length > 0 && (
-                <>
-                  <Box py="2">
-                    <Text size="1" color="gray" weight="medium">
-                      PINNED CHATS
-                    </Text>
-                  </Box>
-                  {pinnedChats.map(chat => (
-                    <ChatButton
-                      key={chat.id}
-                      chat={chat}
-                      isActive={chat.id === currentChatId}
-                      onClick={handleChatClick}
-                    />
-                  ))}
-                </>
-              )}
-
-              {/* Recent Chats Header */}
+        {/* Main Chat List */}
+        <ScrollArea style={{ flexGrow: 1 }}>
+          <Flex direction="column" px="3" py="1">
+            {/* Pinned chats header */}
+            {pinnedChats.length > 0 && (
               <Box py="2">
                 <Text size="1" color="gray" weight="medium">
-                  RECENT CHATS
+                  PINNED CHATS
                 </Text>
               </Box>
+            )}
 
-              {/* Unpinned Chats */}
-              {unpinnedChats.map(chat => (
+            {/* Pinned chats */}
+            {pinnedChats.map(chat => (
+              <ChatButton
+                key={chat.id}
+                chat={chat}
+                isActive={chat.id === currentChatId}
+                onClick={handleChatClick}
+              />
+            ))}
+
+            {/* Recent Chats header */}
+            <Box py="2">
+              <Text size="1" color="gray" weight="medium">
+                RECENT CHATS
+              </Text>
+            </Box>
+
+            {/* Unpinned chats */}
+            {unpinnedChats.length === 0 ? (
+              <Text
+                size="1"
+                color="gray"
+                style={{ marginLeft: '4px', marginTop: '4px', marginBottom: '4px' }}
+              >
+                No chats yet
+              </Text>
+            ) : (
+              unpinnedChats.map(chat => (
                 <ChatButton
                   key={chat.id}
                   chat={chat}
                   isActive={chat.id === currentChatId}
                   onClick={handleChatClick}
                 />
-              ))}
-            </Flex>
-          </div>
+              ))
+            )}
+          </Flex>
         </ScrollArea>
+        
+        {/* Todo Lists Section - moved to bottom of sidebar */}
+        <TodoLists />
 
         {/* Footer */}
         <SidebarFooter

@@ -13,7 +13,8 @@ import WelcomeScreen from './components/WelcomeScreen';
 import NewChatScreen from './components/NewChatScreen';
 import ChatScreen from './components/ChatScreen';
 import Sidebar from './components/Sidebar';
-import { preloadChats, preloadMessages } from './shapes';
+import Todo from './components/Todo';
+import { preloadChats, preloadMessages, preloadTodoLists, preloadTodoItems } from './shapes';
 import { ChatSidebarProvider } from './components/ChatSidebarProvider';
 
 // Define the root route
@@ -39,7 +40,10 @@ const rootRoute = createRootRoute({
       // Add storage event listener to detect changes from other tabs
       window.addEventListener('storage', checkAuth);
 
-      preloadChats().then(() => {
+      Promise.all([
+        preloadChats(),
+        preloadTodoLists()
+      ]).then(() => {
         setLoading(false);
       });
 
@@ -114,8 +118,19 @@ const chatRoute = createRoute({
   ),
 });
 
+const todoRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/todo/$listId',
+  loader: async ({ params }) => {
+    await preloadTodoItems(params.listId);
+    // Preload the lists to ensure we have the list name
+    await preloadTodoLists();
+  },
+  component: () => <Todo />,
+});
+
 // Create the router
-const routeTree = rootRoute.addChildren([welcomeRoute, chatRoute]);
+const routeTree = rootRoute.addChildren([welcomeRoute, chatRoute, todoRoute]);
 
 const router = createRouter({ routeTree });
 
