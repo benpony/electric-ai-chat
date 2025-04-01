@@ -264,6 +264,7 @@ export const postgresToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       if (!dbUrlParam) {
@@ -293,6 +294,7 @@ export const postgresToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       if (!dbUrlParam) {

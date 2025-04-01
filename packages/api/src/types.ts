@@ -66,6 +66,7 @@ export interface ToolHandler {
     args: unknown,
     chatId: string,
     messageId: string,
+    abortController: AbortController,
     dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
   ) => Promise<{
     content: string;

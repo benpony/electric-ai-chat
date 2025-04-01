@@ -128,6 +128,7 @@ async function processToolCall(
   toolCall: ToolCall,
   chatId: string,
   messageId: string,
+  abortController: AbortController,
   dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
 ): Promise<{
   content: string;
@@ -199,7 +200,7 @@ If you're intentionally repeating this operation, please proceed. Otherwise, con
 
     try {
       // Process the tool call
-      const result = await handler.process(args, chatId, messageId, dbUrlParam);
+      const result = await handler.process(args, chatId, messageId, abortController, dbUrlParam);
 
       // Clear the thinking text
       await db`
@@ -605,7 +606,13 @@ Please avoid repeating these operations unless specifically requested by the use
     // Process each tool call, completing the current message and creating a new one after each call
     for (const toolCall of toolCalls) {
       // Process the tool call
-      const result = await processToolCall(toolCall, chatId, currentMessageId, dbUrlParam);
+      const result = await processToolCall(
+        toolCall,
+        chatId,
+        currentMessageId,
+        abortController,
+        dbUrlParam
+      );
 
       // Complete the current message if it has content
       if (fullContent.trim().length > 0) {

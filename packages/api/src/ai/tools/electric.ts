@@ -65,6 +65,7 @@ export const electricToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       const { query } = args as { query: string };

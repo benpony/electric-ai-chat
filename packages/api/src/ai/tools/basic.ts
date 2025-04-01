@@ -151,6 +151,7 @@ export const basicToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       const { context } = args as { context: string };
@@ -172,6 +173,7 @@ export const basicToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       const { name } = args as { name: string };
@@ -193,6 +195,7 @@ export const basicToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       const { pinned } = args as { pinned: boolean };

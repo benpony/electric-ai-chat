@@ -211,6 +211,7 @@ export const fileToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       const { path, mime_type, content } = args as {
@@ -238,6 +239,7 @@ export const fileToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       const { path, content } = args as { path: string; content: string };
@@ -261,6 +263,7 @@ export const fileToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       const { path } = args as { path: string };
@@ -284,6 +287,7 @@ export const fileToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       const { old_path, new_path } = args as { old_path: string; new_path: string };
@@ -307,6 +311,7 @@ export const fileToolHandlers: ToolHandler[] = [
       args: unknown,
       chatId: string,
       messageId: string,
+      abortController: AbortController,
       dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
     ) => {
       const { path } = args as { path: string };
