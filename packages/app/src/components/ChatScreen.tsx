@@ -1,7 +1,16 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { useParams } from '@tanstack/react-router';
-import { Box, Flex, Text, IconButton, ScrollArea, TextArea, Tooltip } from '@radix-ui/themes';
-import { Menu, Send, FileText } from 'lucide-react';
+import {
+  Box,
+  Flex,
+  Text,
+  IconButton,
+  ScrollArea,
+  TextArea,
+  Tooltip,
+  Switch,
+} from '@radix-ui/themes';
+import { Menu, Send, FileText, Terminal } from 'lucide-react';
 import { useSidebar } from './SidebarProvider';
 import { useChatSidebar } from './ChatSidebarProvider';
 import { useChat, useMessagesShape, useFilesShape } from '../shapes';
@@ -45,16 +54,19 @@ interface UserPromptProps {
 
 // UserPrompt component to display user messages
 const UserPrompt = memo(({ message, isCurrentUser }: UserPromptProps) => {
+  const isSystemMessage = message.role === 'system';
+
   return (
     <Flex
       direction="column"
       style={{
-        maxWidth: '60%',
+        maxWidth: isSystemMessage ? '100%' : '60%',
         marginBottom: '10px',
         alignItems: isCurrentUser ? 'flex-end' : 'flex-start',
+        alignSelf: isSystemMessage ? 'stretch' : 'auto',
       }}
     >
-      {!isCurrentUser && (
+      {!isCurrentUser && !isSystemMessage && (
         <Text
           size="1"
           style={{
@@ -66,15 +78,35 @@ const UserPrompt = memo(({ message, isCurrentUser }: UserPromptProps) => {
           {message.user_name}
         </Text>
       )}
+      {isSystemMessage && (
+        <Text
+          size="1"
+          style={{
+            color: 'var(--amber-11)',
+            marginLeft: '4px',
+            marginBottom: '3px',
+            fontWeight: 'bold',
+          }}
+        >
+          System
+        </Text>
+      )}
       <Box
         style={{
-          backgroundColor: isCurrentUser ? 'var(--accent-9)' : 'var(--color-background-message)',
-          color: isCurrentUser ? 'white' : 'var(--gray-12)',
+          backgroundColor: isSystemMessage
+            ? 'var(--amber-3)'
+            : isCurrentUser
+              ? 'var(--accent-9)'
+              : 'var(--color-background-message)',
+          color: isSystemMessage ? 'var(--amber-11)' : isCurrentUser ? 'white' : 'var(--gray-12)',
           padding: '4px 12px 6px 12px',
           borderRadius: '18px',
           position: 'relative',
-          maxWidth: 'fit-content',
+          maxWidth: isSystemMessage ? '100%' : 'fit-content',
+          width: isSystemMessage ? '100%' : 'auto',
           boxShadow: 'var(--shadow-message)',
+          borderLeft: isSystemMessage ? '3px solid var(--amber-9)' : 'none',
+          fontFamily: isSystemMessage ? 'monospace' : 'inherit',
         }}
       >
         <Text size="2" style={{ whiteSpace: 'pre-wrap' }}>
@@ -101,8 +133,17 @@ const MessageList = memo(
               <Flex
                 key={msg.id}
                 justify={
-                  msg.role === 'agent' ? 'center' : msg.user_name === username ? 'end' : 'start'
+                  msg.role === 'system'
+                    ? 'start'
+                    : msg.role === 'agent'
+                      ? 'center'
+                      : msg.user_name === username
+                        ? 'end'
+                        : 'start'
                 }
+                style={{
+                  width: '100%',
+                }}
               >
                 {msg.role === 'agent' ? (
                   <AiResponse message={msg} />
@@ -211,11 +252,17 @@ export default function ChatScreen() {
   const { toggleChatSidebar, isChatSidebarOpen } = useChatSidebar();
   const { data: files } = useFilesShape(chatId);
   const hasFiles = files && files.length > 0;
+  const [showSystemMessages, setShowSystemMessages] = useState(
+    localStorage.getItem('showSystemMessages') === 'true'
+  );
 
-  // Filter out system messages
-  // TODO: add a toggle to the ai so that users can see these system messages as they
-  // are quite informative for understanding the ai's behavior
-  const messages = allMessages.filter(msg => msg.role !== 'system');
+  // Save showSystemMessages preference to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('showSystemMessages', showSystemMessages.toString());
+  }, [showSystemMessages]);
+
+  // Filter messages based on the toggle state
+  const messages = allMessages.filter(msg => showSystemMessages || msg.role !== 'system');
 
   // Define CSS variables for theming that will adapt to dark mode
   const themeVariables = {
@@ -384,21 +431,34 @@ export default function ChatScreen() {
             {chat.name}
           </Text>
         </Flex>
-        {/* Only show toggle button if there are files */}
-        {hasFiles && (
-          <Tooltip content="Chat Assets">
-            <IconButton
-              variant="ghost"
-              size="1"
-              onClick={toggleChatSidebar}
-              style={{
-                opacity: isChatSidebarOpen ? 1 : 0.5,
-              }}
-            >
-              <FileText size={18} />
-            </IconButton>
+        <Flex align="center" gap="2">
+          <Tooltip content="Show System Messages">
+            <Flex align="center" gap="1">
+              <Terminal size={14} style={{ opacity: showSystemMessages ? 1 : 0.5 }} />
+              <Switch
+                size="1"
+                checked={showSystemMessages}
+                onCheckedChange={setShowSystemMessages}
+                highContrast
+              />
+            </Flex>
           </Tooltip>
-        )}
+          {/* Only show toggle button if there are files */}
+          {hasFiles && (
+            <Tooltip content="Chat Assets">
+              <IconButton
+                variant="ghost"
+                size="1"
+                onClick={toggleChatSidebar}
+                style={{
+                  opacity: isChatSidebarOpen ? 1 : 0.5,
+                }}
+              >
+                <FileText size={18} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Flex>
       </Flex>
 
       {/* Main content area */}

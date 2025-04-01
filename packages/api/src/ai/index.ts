@@ -534,6 +534,7 @@ Please avoid repeating these operations unless specifically requested by the use
   let toolCalls: ToolCall[] = [];
   let tokenBuffer = currentTokenBuffer;
   let lastInsertTime = currentLastInsertTime;
+  let currentMessageId = messageId;
 
   // Combine all tools
   const tools = [...basicTools, ...electricTools, ...fileTools, ...postgresTools, ...todoTools];
@@ -585,7 +586,7 @@ Please avoid repeating these operations unless specifically requested by the use
         if (currentTime - lastInsertTime >= 60 || tokenBuffer.length > 100) {
           await db`
             INSERT INTO tokens (message_id, token_number, token_text)
-            VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
+            VALUES (${currentMessageId}, ${tokenNumber}, ${tokenBuffer})
           `;
           tokenNumber++;
           tokenBuffer = '';
@@ -597,14 +598,66 @@ Please avoid repeating these operations unless specifically requested by the use
     // Collect system messages for the next recursive call
     const systemMessages: ChatCompletionSystemMessageParam[] = [];
 
-    // Process any tool calls
+    // Process each tool call, completing the current message and creating a new one after each call
     for (const toolCall of toolCalls) {
-      const result = await processToolCall(toolCall, chatId, messageId, dbUrlParam);
+      // Process the tool call
+      const result = await processToolCall(toolCall, chatId, currentMessageId, dbUrlParam);
 
-      // Add any direct content to the response
-      if (result.content) {
-        fullContent += result.content;
-        tokenBuffer += result.content;
+      // Complete the current message if it has content
+      if (fullContent.trim().length > 0) {
+        // Save any remaining token buffer
+        if (tokenBuffer.length > 0) {
+          await db`
+            INSERT INTO tokens (message_id, token_number, token_text)
+            VALUES (${currentMessageId}, ${tokenNumber}, ${tokenBuffer})
+          `;
+        }
+
+        // Update the current message to completed status
+        await db`
+          UPDATE messages
+          SET status = 'completed', content = ${fullContent}, thinking_text = ''
+          WHERE id = ${currentMessageId}
+        `;
+
+        // Delete tokens for the completed message
+        await db`DELETE FROM tokens WHERE message_id = ${currentMessageId}`;
+
+        // Create a new message for content that will come after this tool call
+        currentMessageId = randomUUID();
+        await db`
+          INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
+          VALUES (${currentMessageId}, ${chatId}, '', 'AI Assistant', 'agent', 'pending', NOW())
+        `;
+
+        // Reset tracking variables for the new message
+        fullContent = result.content || '';
+        tokenBuffer = fullContent;
+        tokenNumber = 0;
+
+        // Insert initial content if we have any from the tool result
+        if (tokenBuffer.length > 0) {
+          await db`
+            INSERT INTO tokens (message_id, token_number, token_text)
+            VALUES (${currentMessageId}, ${tokenNumber}, ${tokenBuffer})
+          `;
+          tokenNumber++;
+          tokenBuffer = '';
+        }
+      } else {
+        // If no content, just add the tool result to the current message
+        fullContent = result.content || '';
+        tokenBuffer = fullContent;
+
+        // Insert content if we have any from the tool result
+        if (tokenBuffer.length > 0) {
+          await db`
+            INSERT INTO tokens (message_id, token_number, token_text)
+            VALUES (${currentMessageId}, ${tokenNumber}, ${tokenBuffer})
+          `;
+          tokenNumber++;
+          tokenBuffer = '';
+        }
       }
 
       // If the tool result includes a system message, add it to the collection
@@ -625,28 +678,17 @@ Please avoid repeating these operations unless specifically requested by the use
       await db`
         UPDATE messages
         SET thinking_text = 'Processing tool results and continuing...'
-        WHERE id = ${messageId}
+        WHERE id = ${currentMessageId}
       `;
 
-      // Update with current progress
-      if (tokenBuffer.length > 0) {
-        await db`
-          INSERT INTO tokens (message_id, token_number, token_text)
-          VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
-        `;
-        tokenNumber++;
-        tokenBuffer = '';
-        lastInsertTime = Date.now();
-      }
-
-      // Make a recursive call
+      // Make a recursive call with the new message ID
       console.log(
         `Making recursive call at depth ${recursionDepth + 1} with ${systemMessages.length} new system messages`
       );
 
       return processAIStream(
         chatId,
-        messageId,
+        currentMessageId,
         context,
         dbUrlParam,
         recursionDepth + 1,
@@ -658,22 +700,28 @@ Please avoid repeating these operations unless specifically requested by the use
       );
     } else {
       // No more tool calls, finalize the message
-      if (tokenBuffer.length > 0) {
+      if (fullContent.trim().length > 0) {
+        if (tokenBuffer.length > 0) {
+          await db`
+            INSERT INTO tokens (message_id, token_number, token_text)
+            VALUES (${currentMessageId}, ${tokenNumber}, ${tokenBuffer})
+          `;
+        }
+
+        // Update the message with the final content
         await db`
-          INSERT INTO tokens (message_id, token_number, token_text)
-          VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
+          UPDATE messages
+          SET status = 'completed', content = ${fullContent}, thinking_text = ''
+          WHERE id = ${currentMessageId}
         `;
+
+        // Delete tokens
+        await db`DELETE FROM tokens WHERE message_id = ${currentMessageId}`;
+      } else {
+        // No content in the final message, delete it
+        await db`DELETE FROM messages WHERE id = ${currentMessageId}`;
+        await db`DELETE FROM tokens WHERE message_id = ${currentMessageId}`;
       }
-
-      // Update the message with the final content
-      await db`
-        UPDATE messages
-        SET status = 'completed', content = ${fullContent}, thinking_text = ''
-        WHERE id = ${messageId}
-      `;
-
-      // Delete tokens
-      await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
     }
   } catch (error) {
     console.error('Error processing AI stream:', error);
@@ -685,11 +733,11 @@ Please avoid repeating these operations unless specifically requested by the use
     await db`
       UPDATE messages
       SET status = 'completed', content = ${fullContent}, thinking_text = ''
-      WHERE id = ${messageId}
+      WHERE id = ${currentMessageId}
     `;
 
     // Delete tokens
-    await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
+    await db`DELETE FROM tokens WHERE message_id = ${currentMessageId}`;
   }
 }
 
