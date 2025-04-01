@@ -26,6 +26,7 @@ type Message = {
   role: string;
   user_name: string;
   created_at: Date;
+  updated_at: Date;
   chat_id: string;
   status: string;
   thinking_text: string;
@@ -128,7 +129,7 @@ const MessageList = memo(
           ref={scrollContentRef}
         >
           {messages
-            .sort((a, b) => a.created_at.getTime() - b.created_at.getTime())
+            .sort((a, b) => a.updated_at.getTime() - b.updated_at.getTime())
             .map(msg => (
               <Flex
                 key={msg.id}

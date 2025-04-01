@@ -66,8 +66,8 @@ export async function createAIResponse(
 
     // Insert pending message
     await db`
-      INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
-      VALUES (${messageId}, ${chatId}, '', 'AI Assistant', 'agent', 'pending', NOW())
+      INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
+      VALUES (${messageId}, ${chatId}, '', 'AI Assistant', 'agent', 'pending', NOW(), NOW())
     `;
 
     // Start streaming in background
@@ -192,7 +192,8 @@ If you're intentionally repeating this operation, please proceed. Otherwise, con
     // Update the message with the thinking text
     await db`
       UPDATE messages
-      SET thinking_text = ${thinkingText}
+      SET thinking_text = ${thinkingText},
+          updated_at = NOW()
       WHERE id = ${messageId}
     `;
 
@@ -203,7 +204,8 @@ If you're intentionally repeating this operation, please proceed. Otherwise, con
       // Clear the thinking text
       await db`
         UPDATE messages
-        SET thinking_text = ''
+        SET thinking_text = '',
+            updated_at = NOW()
         WHERE id = ${messageId}
       `;
 
@@ -266,7 +268,8 @@ If you're intentionally repeating this operation, please proceed. Otherwise, con
       // Clear the thinking text on error
       await db`
         UPDATE messages
-        SET thinking_text = ''
+        SET thinking_text = '',
+            updated_at = NOW()
         WHERE id = ${messageId}
       `;
 
@@ -294,7 +297,8 @@ If you're intentionally repeating this operation, please proceed. Otherwise, con
     // Clear the thinking text on error
     await db`
       UPDATE messages
-      SET thinking_text = ''
+      SET thinking_text = '',
+          updated_at = NOW()
       WHERE id = ${messageId}
     `;
 
@@ -343,7 +347,7 @@ async function processAIStream(
     // Update the message with the accumulated content
     await db`
       UPDATE messages
-      SET status = 'completed', content = ${accumulatedContent + '\n\nReached maximum number of tool calls.'}
+      SET status = 'completed', content = ${accumulatedContent + '\n\nReached maximum number of tool calls.'}, updated_at = NOW()
       WHERE id = ${messageId}
     `;
 
@@ -616,7 +620,10 @@ Please avoid repeating these operations unless specifically requested by the use
         // Update the current message to completed status
         await db`
           UPDATE messages
-          SET status = 'completed', content = ${fullContent}, thinking_text = ''
+          SET status = 'completed', 
+              content = ${fullContent}, 
+              thinking_text = '',
+              updated_at = NOW()
           WHERE id = ${currentMessageId}
         `;
 
@@ -626,8 +633,8 @@ Please avoid repeating these operations unless specifically requested by the use
         // Create a new message for content that will come after this tool call
         currentMessageId = randomUUID();
         await db`
-          INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
-          VALUES (${currentMessageId}, ${chatId}, '', 'AI Assistant', 'agent', 'pending', NOW())
+          INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
+          VALUES (${currentMessageId}, ${chatId}, '', 'AI Assistant', 'agent', 'pending', NOW(), NOW())
         `;
 
         // Reset tracking variables for the new message
@@ -677,7 +684,7 @@ Please avoid repeating these operations unless specifically requested by the use
       // Show a thinking state
       await db`
         UPDATE messages
-        SET thinking_text = 'Processing tool results and continuing...'
+        SET thinking_text = 'Processing tool results and continuing...', updated_at = NOW()
         WHERE id = ${currentMessageId}
       `;
 
@@ -711,7 +718,10 @@ Please avoid repeating these operations unless specifically requested by the use
         // Update the message with the final content
         await db`
           UPDATE messages
-          SET status = 'completed', content = ${fullContent}, thinking_text = ''
+          SET status = 'completed', 
+              content = ${fullContent}, 
+              thinking_text = '',
+              updated_at = NOW()
           WHERE id = ${currentMessageId}
         `;
 
@@ -732,7 +742,10 @@ Please avoid repeating these operations unless specifically requested by the use
     // Update the message with error content
     await db`
       UPDATE messages
-      SET status = 'completed', content = ${fullContent}, thinking_text = ''
+      SET status = 'completed', 
+          content = ${fullContent}, 
+          thinking_text = '',
+          updated_at = NOW()
       WHERE id = ${currentMessageId}
     `;
 
@@ -747,8 +760,8 @@ async function storeSystemMessage(chatId: string, content: string) {
     const messageId = randomUUID();
 
     await db`
-      INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
-      VALUES (${messageId}, ${chatId}, ${content}, 'System', 'system', 'completed', NOW())
+      INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
+      VALUES (${messageId}, ${chatId}, ${content}, 'System', 'system', 'completed', NOW(), NOW())
     `;
 
     console.log(`Stored system message for context: ${content.substring(0, 50)}...`);

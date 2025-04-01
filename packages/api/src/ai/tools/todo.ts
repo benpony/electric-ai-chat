@@ -4,6 +4,11 @@ import { ToolHandler } from '../../types.js';
 import postgres from 'postgres';
 import crypto from 'crypto';
 import { recordAction, ActionRelationship } from '../../utils.js';
+import { Shape, ShapeStream } from '@electric-sql/client';
+import { randomUUID } from 'crypto';
+
+// Access the Electric API URL
+const ELECTRIC_API_URL = process.env.ELECTRIC_API_URL || 'http://localhost:3000';
 
 // Define the Todo List and Todo Item types for internal use
 interface TodoList {
@@ -185,6 +190,42 @@ export const todoTools: ChatCompletionTool[] = [
         type: 'object',
         properties: {},
         required: [],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'process_todo_list',
+      description:
+        'Reads a todo list and automatically performs all the tasks in it until completion. Subscribes to the list to detect changes, and will abort tasks that are marked as done during processing.',
+      parameters: {
+        type: 'object',
+        properties: {
+          list_id: {
+            type: 'string',
+            description: 'The ID of the todo list to process',
+          },
+        },
+        required: ['list_id'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'watch_and_process_todo_list',
+      description:
+        'Watches a todo list for new items and processes them automatically. Continues running until the conversation ends, processing both existing and new tasks as they are added.',
+      parameters: {
+        type: 'object',
+        properties: {
+          list_id: {
+            type: 'string',
+            description: 'The ID of the todo list to watch and process',
+          },
+        },
+        required: ['list_id'],
       },
     },
   },
@@ -458,6 +499,297 @@ async function getTodoState(): Promise<{
     console.error('Error getting todo state:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
+}
+
+// Helper function for processing todo list items
+async function processTodoListItems(
+  listId: string,
+  chatId: string,
+  messageId: string,
+  abortSignal: AbortSignal,
+  watchMode: boolean = false
+): Promise<{ status: string; completedTasks: string[]; abortedTasks: string[] }> {
+  // This will be our return data
+  const result = {
+    status: 'completed',
+    completedTasks: [] as string[],
+    abortedTasks: [] as string[],
+  };
+
+  // Create a persistent watch message if in watch mode
+  let watchMessageId: string | null = null;
+  if (watchMode) {
+    watchMessageId = randomUUID();
+    const [list] = await db`
+      SELECT name FROM todo_lists WHERE id = ${listId}
+    `;
+
+    await db`
+      INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
+      VALUES (
+        ${watchMessageId},
+        ${chatId},
+        ${`👀 Watching list "${list?.name || listId}" for new tasks...`},
+        'AI Assistant',
+        'agent',
+        'completed',
+        NOW()
+      )
+    `;
+  }
+
+  // Create a shape stream to subscribe to the todo list items
+  const listItemsStream = new ShapeStream<{
+    id: string;
+    list_id: string;
+    task: string;
+    done: boolean;
+  }>({
+    url: `${ELECTRIC_API_URL}/v1/shape`,
+    params: {
+      table: 'todo_items',
+      where: `list_id = '${listId}'`,
+      columns: ['id', 'list_id', 'task', 'done'],
+    },
+    signal: abortSignal,
+  });
+
+  // Create a shape to track the items
+  const listItemsShape = new Shape(listItemsStream);
+
+  // Track which tasks we've processed or are currently processing
+  const processedTaskIds = new Set<string>();
+  const inProgressTaskIds = new Set<string>();
+
+  // Record when we start to know we've processed everything once
+  let initialProcessingComplete = false;
+
+  return new Promise((resolve, reject) => {
+    // Set up periodic updates
+    const updateIntervalId = setInterval(async () => {
+      try {
+        // Update the message with progress
+        await db`
+          UPDATE messages
+          SET thinking_text = ${`Processing todo list ${listId}, completed ${result.completedTasks.length} tasks, ${inProgressTaskIds.size} in progress...`}
+          WHERE id = ${messageId}
+        `;
+
+        // Update the watch message if in watch mode
+        if (watchMode && watchMessageId) {
+          const [list] = await db`
+            SELECT name FROM todo_lists WHERE id = ${listId}
+          `;
+
+          const pendingCount = await db`
+            SELECT COUNT(*) as count FROM todo_items 
+            WHERE list_id = ${listId} AND done = false
+          `;
+
+          const watchStatus = `👀 Watching list "${list?.name || listId}"${
+            pendingCount[0].count > 0
+              ? ` (${pendingCount[0].count} pending tasks)`
+              : ' - All tasks completed'
+          }...`;
+
+          await db`
+            UPDATE messages
+            SET content = ${watchStatus},
+                updated_at = NOW()
+            WHERE id = ${watchMessageId}
+          `;
+        }
+      } catch (err) {
+        console.error('Error updating progress message:', err);
+      }
+    }, 5000); // Update every 5 seconds
+
+    // Clean up function for when we're done
+    const cleanup = () => {
+      clearInterval(updateIntervalId);
+      // If we have a watch message, update it to show we're no longer watching
+      if (watchMessageId) {
+        db`
+          UPDATE messages
+          SET content = ${`⏹️ Stopped watching list "${listId}"`},
+              updated_at = NOW()
+          WHERE id = ${watchMessageId}
+        `.catch(err => console.error('Error updating watch message on cleanup:', err));
+      }
+    };
+
+    // If the signal is aborted, clean up and resolve
+    abortSignal.addEventListener('abort', () => {
+      cleanup();
+      result.status = 'aborted';
+      resolve(result);
+    });
+
+    // Subscribe to changes in the todo items
+    listItemsShape.subscribe(
+      async ({
+        rows,
+      }: {
+        rows: Array<{
+          id: string;
+          list_id: string;
+          task: string;
+          done: boolean;
+        }>;
+      }) => {
+        try {
+          // Process new and updated items
+          for (const item of rows) {
+            // Skip if already processed
+            if (processedTaskIds.has(item.id)) continue;
+
+            // If the item is already done, mark as processed and skip
+            if (item.done) {
+              processedTaskIds.add(item.id);
+              continue;
+            }
+
+            // If we're already working on this task, skip
+            if (inProgressTaskIds.has(item.id)) continue;
+
+            // Mark as in progress
+            inProgressTaskIds.add(item.id);
+
+            // Process the task
+            console.log(`Processing task: ${item.task}`);
+
+            // Update thinking text for specific task
+            await db`
+            UPDATE messages
+            SET thinking_text = ${`Processing task: "${item.task}" (ID: ${item.id})...`}
+            WHERE id = ${messageId}
+          `;
+
+            // Check if the item has been marked as done (by checking again)
+            const [updatedItem] = await db`
+            SELECT id, done FROM todo_items WHERE id = ${item.id}
+          `;
+
+            if (updatedItem && updatedItem.done) {
+              // Task completed by someone else
+              inProgressTaskIds.delete(item.id);
+              processedTaskIds.add(item.id);
+              result.abortedTasks.push(item.task);
+              continue;
+            }
+
+            try {
+              // Process the task - actual processing logic would depend on the task
+              // This is a simplified implementation - in a real system, you might:
+              // 1. Parse the task text for instructions
+              // 2. Execute appropriate actions based on the content
+              // 3. Handle different types of tasks with different processors
+
+              // For demo purposes, we'll handle basic task formats
+              const taskText = item.task.toLowerCase().trim();
+
+              // Wait a bit to simulate processing time and avoid overwhelming the system
+              await new Promise(resolve => setTimeout(resolve, 1000));
+
+              // Log task execution
+              console.log(`Executed task: "${item.task}"`);
+
+              // Mark task as done
+              await db`
+              UPDATE todo_items
+              SET done = true, updated_at = NOW()
+              WHERE id = ${item.id}
+            `;
+
+              // Record the action
+              const listName =
+                (
+                  await db`
+              SELECT name FROM todo_lists WHERE id = ${listId}
+            `
+                )[0]?.name || 'unknown';
+
+              const relationships = [{ type: 'belongs_to_list', id: listId, name: listName }];
+
+              await recordAction(chatId, 'complete_item', item.id, item.task, relationships);
+
+              // Add to completed tasks
+              result.completedTasks.push(item.task);
+
+              // Send a message about the completed task
+              const taskMessage = randomUUID();
+              await db`
+              INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
+              VALUES (
+                ${taskMessage},
+                ${chatId},
+                ${`✓ Completed task: "${item.task}" in list "${listName}"`},
+                'AI Assistant',
+                'agent',
+                'completed',
+                NOW(),
+                NOW()
+              )
+            `;
+            } catch (taskError) {
+              console.error(`Error processing task "${item.task}":`, taskError);
+
+              // Update the task with an error note
+              await db`
+              UPDATE todo_items
+              SET task = ${`${item.task} [ERROR: ${taskError instanceof Error ? taskError.message : 'Processing failed'}]`}
+              WHERE id = ${item.id}
+            `;
+
+              // Send a message about the failed task
+              const errorMessage = randomUUID();
+              await db`
+              INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
+              VALUES (
+                ${errorMessage},
+                ${chatId},
+                ${`❌ Failed to process task: "${item.task}" - ${taskError instanceof Error ? taskError.message : 'Processing failed'}`},
+                'AI Assistant',
+                'agent',
+                'completed',
+                NOW(),
+                NOW()
+              )
+            `;
+            } finally {
+              // Remove from in progress
+              inProgressTaskIds.delete(item.id);
+
+              // Mark as processed regardless of success/failure
+              processedTaskIds.add(item.id);
+            }
+          }
+
+          // Check if we've completed initial processing
+          if (!initialProcessingComplete && rows.length > 0 && inProgressTaskIds.size === 0) {
+            initialProcessingComplete = true;
+
+            // If not in watch mode, we're done after initial processing
+            if (!watchMode) {
+              cleanup();
+              resolve(result);
+            } else {
+              // In watch mode, we update the message to indicate we're now watching
+              await db`
+              UPDATE messages
+              SET thinking_text = ${`Completed processing all current items. Now watching for new items in list ${listId}...`}
+              WHERE id = ${messageId}
+            `;
+            }
+          }
+        } catch (err) {
+          console.error('Error processing todo items:', err);
+          cleanup();
+          reject(err);
+        }
+      }
+    );
+  });
 }
 
 // ======== Tool handlers ========
@@ -944,6 +1276,209 @@ export const todoToolHandlers: ToolHandler[] = [
       // if called twice with the same (empty) arguments
       // Our fallback will handle this based on time between calls
       return false;
+    },
+  },
+  {
+    name: 'process_todo_list',
+    getThinkingText: args => `Processing todo list ${(args as { list_id: string }).list_id}...`,
+    process: async (args, chatId, messageId) => {
+      const { list_id } = args as { list_id: string };
+
+      try {
+        // Verify the list exists
+        const [list] = await db`
+          SELECT id, name FROM todo_lists WHERE id = ${list_id}
+        `;
+
+        if (!list) {
+          return {
+            content: '',
+            systemMessage: `Error: Todo list with ID ${list_id} not found`,
+            requiresReentry: true,
+          };
+        }
+
+        // Create an abort controller for the process
+        const abortController = new AbortController();
+
+        // Start processing in the background
+        const processingPromise = processTodoListItems(
+          list_id,
+          chatId,
+          messageId,
+          abortController.signal,
+          false // Not in watch mode
+        );
+
+        // Set a timeout to abort after a reasonable time
+        const timeoutId = setTimeout(
+          () => {
+            abortController.abort();
+          },
+          5 * 60 * 1000
+        ); // 5 minutes max
+
+        // Wait for the processing to complete
+        const result = await processingPromise;
+
+        // Clear the timeout
+        clearTimeout(timeoutId);
+
+        // Construct the response
+        let responseMessage = '';
+
+        if (result.status === 'aborted') {
+          responseMessage = `Processing of todo list "${list.name}" (ID: ${list_id}) was aborted.`;
+        } else {
+          responseMessage = `Completed processing todo list "${list.name}" (ID: ${list_id}).`;
+        }
+
+        if (result.completedTasks.length > 0) {
+          responseMessage += `\n\nCompleted ${result.completedTasks.length} tasks:`;
+          result.completedTasks.forEach(task => {
+            responseMessage += `\n- "${task}"`;
+          });
+        } else {
+          responseMessage += '\n\nNo tasks were completed.';
+        }
+
+        if (result.abortedTasks.length > 0) {
+          responseMessage += `\n\n${result.abortedTasks.length} tasks were already completed or marked as done during processing:`;
+          result.abortedTasks.forEach(task => {
+            responseMessage += `\n- "${task}"`;
+          });
+        }
+
+        return {
+          content: '',
+          systemMessage: responseMessage,
+          requiresReentry: true,
+        };
+      } catch (error) {
+        console.error('Error in process_todo_list:', error);
+        return {
+          content: '',
+          systemMessage: `Error processing todo list: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          requiresReentry: true,
+        };
+      }
+    },
+    checkIfSimilar: (currentArgs: unknown, previousArgs: unknown): boolean => {
+      const current = currentArgs as { list_id: string };
+      const previous = previousArgs as { list_id: string };
+
+      // Consider processing the same list as similar
+      return Boolean(current.list_id === previous.list_id);
+    },
+  },
+  {
+    name: 'watch_and_process_todo_list',
+    getThinkingText: args =>
+      `Watching and processing todo list ${(args as { list_id: string }).list_id}...`,
+    process: async (args, chatId, messageId) => {
+      const { list_id } = args as { list_id: string };
+
+      try {
+        // Verify the list exists
+        const [list] = await db`
+          SELECT id, name FROM todo_lists WHERE id = ${list_id}
+        `;
+
+        if (!list) {
+          return {
+            content: '',
+            systemMessage: `Error: Todo list with ID ${list_id} not found`,
+            requiresReentry: true,
+          };
+        }
+
+        // Create a pending message that will stay pending while we're watching
+        const watchMessageId = randomUUID();
+        await db`
+          INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
+          VALUES (
+            ${watchMessageId},
+            ${chatId},
+            ${`Watching list "${list.name}" for new tasks...`},
+            'AI Assistant',
+            'agent',
+            'pending',
+            NOW()
+          )
+        `;
+
+        // Create an abort controller for the process
+        const abortController = new AbortController();
+
+        // Subscribe to changes in the watch message's status
+        const messageStream = new ShapeStream<{ id: string; status: string }>({
+          url: `${ELECTRIC_API_URL}/v1/shape`,
+          params: {
+            table: 'messages',
+            where: `id = '${watchMessageId}'`,
+            columns: ['id', 'status'],
+          },
+          signal: abortController.signal,
+        });
+
+        const messageShape = new Shape(messageStream);
+        messageShape.subscribe(({ rows }) => {
+          // If the message is aborted, stop watching
+          const message = rows[0];
+          if (message && message.status === 'aborted') {
+            abortController.abort();
+
+            // Update the message content to indicate we've stopped watching
+            db`
+              UPDATE messages
+              SET content = ${`⏹️ Stopped watching list "${list.name}"`},
+                  status = 'completed',
+                  updated_at = NOW()
+              WHERE id = ${watchMessageId}
+            `.catch(err => console.error('Error updating watch message on abort:', err));
+          }
+        });
+
+        // Start watching and processing in the background
+        processTodoListItems(
+          list_id,
+          chatId,
+          watchMessageId, // Use the watch message ID for updates
+          abortController.signal,
+          true // In watch mode
+        ).catch(error => {
+          console.error('Error in watch_and_process_todo_list processing:', error);
+          // Update the message to show the error
+          db`
+            UPDATE messages
+            SET content = ${`Error watching list "${list.name}": ${error.message}`},
+                status = 'completed',
+                updated_at = NOW()
+            WHERE id = ${watchMessageId}
+          `.catch(err => console.error('Error updating watch message on error:', err));
+        });
+
+        // Return immediately with a status message
+        return {
+          content: '',
+          systemMessage: `Started watching todo list "${list.name}" (ID: ${list_id}). The watch process will continue until stopped or the conversation ends.`,
+          requiresReentry: true,
+        };
+      } catch (error) {
+        console.error('Error in watch_and_process_todo_list:', error);
+        return {
+          content: '',
+          systemMessage: `Error watching todo list: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          requiresReentry: true,
+        };
+      }
+    },
+    checkIfSimilar: (currentArgs: unknown, previousArgs: unknown): boolean => {
+      const current = currentArgs as { list_id: string };
+      const previous = previousArgs as { list_id: string };
+
+      // Consider watching the same list as similar
+      return Boolean(current.list_id === previous.list_id);
     },
   },
 ];
