@@ -199,7 +199,7 @@ const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
 export default function ChatScreen() {
   const { chatId } = useParams({ from: '/chat/$chatId' });
   const chat = useChat(chatId);
-  const { data: messages } = useMessagesShape(chatId);
+  const { data: allMessages } = useMessagesShape(chatId);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -211,6 +211,11 @@ export default function ChatScreen() {
   const { toggleChatSidebar, isChatSidebarOpen } = useChatSidebar();
   const { data: files } = useFilesShape(chatId);
   const hasFiles = files && files.length > 0;
+
+  // Filter out system messages
+  // TODO: add a toggle to the ai so that users can see these system messages as they
+  // are quite informative for understanding the ai's behavior
+  const messages = allMessages.filter(msg => msg.role !== 'system');
 
   // Define CSS variables for theming that will adapt to dark mode
   const themeVariables = {

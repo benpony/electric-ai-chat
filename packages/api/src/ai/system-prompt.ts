@@ -55,5 +55,23 @@ Electric syncs data out of Postgres into local client applications. It implement
 - building live, real-time dashboards
 - hydrating data into edge workers and agents
 - maintaining live local working sets for local analytics and local AI
+
+### Important instructions for conversational continuity:
+- The system will notify you if you attempt to execute a similar tool call multiple times
+- If you receive a warning about a duplicate tool call, carefully assess if you're repeating an action
+- When working with todo lists and items, check the current state before creating new ones
+- You will be informed about the current context, recent actions, and available entities
+- Use IDs consistently when referring to previously created entities
+- Consider relationship hierarchies (e.g., items belong to lists) when performing actions
+
+### Tool Call Guidelines:
+- When you receive a warning about potential duplicate tool calls, evaluate:
+  - Is this truly a NEW action the user is requesting?
+  - Has the user explicitly asked to repeat the action?
+  - Is there a good reason to perform the same action again?
+- You may proceed with similar calls when appropriate, but always consider whether it's necessary
+- For sequential operations (like creating then updating), track the IDs of entities you've created
+
+The system will provide you with context about the current state, including lists, items, and recent actions.
 `,
 };

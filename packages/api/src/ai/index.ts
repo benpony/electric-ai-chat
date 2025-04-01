@@ -9,7 +9,13 @@ import { Shape, ShapeStream } from '@electric-sql/client';
 import { randomUUID } from 'crypto';
 import { db } from '../db.js';
 import { ChatMessage, ToolCall, ToolHandler } from '../types.js';
-import { rowToChatMessage } from '../utils.js';
+import {
+  rowToChatMessage,
+  getRecentActions,
+  formatActionDescription,
+  storeToolCall,
+  detectSimilarToolCalls,
+} from '../utils.js';
 import { systemPrompt } from './system-prompt.js';
 import { basicTools, basicToolHandlers, generateChatName } from './tools/basic.js';
 import {
@@ -20,7 +26,6 @@ import {
 } from './tools/electric.js';
 import { fileTools, fileToolHandlers } from './tools/files.js';
 import { postgresTools, postgresToolHandlers } from './tools/postgres.js';
-import { processStreamChunks } from './stream.js';
 import { model } from '../utils.js';
 import { todoTools, todoToolHandlers } from './tools/todo.js';
 
@@ -140,6 +145,47 @@ async function processToolCall(
       return { content: `\n\nUnsupported tool call: ${toolCall.function.name}` };
     }
 
+    // Check for similar previous tool calls
+    const similarCall = await detectSimilarToolCalls(chatId, toolCall.function.name, args, handler);
+    if (similarCall) {
+      console.log(`Detected similar previous call to ${toolCall.function.name}`);
+
+      // For certain tools, we want to warn about potential duplicates
+      const potentialDuplicateTools = [
+        'create_todo_list',
+        'create_todo_item',
+        'update_todo_item',
+        'delete_todo_list',
+        'delete_todo_item',
+      ];
+
+      if (potentialDuplicateTools.includes(toolCall.function.name)) {
+        // Format the time difference
+        const timeDiff = new Date().getTime() - new Date(similarCall.timestamp).getTime();
+        const minutes = Math.floor(timeDiff / 60000);
+        const timeDesc =
+          minutes < 1
+            ? 'just now'
+            : minutes < 60
+              ? `${minutes} minute(s) ago`
+              : `${Math.floor(minutes / 60)} hour(s) ago`;
+
+        // Warn the LLM about the potential duplicate
+        return {
+          content: '',
+          systemMessage: `WARNING: You are attempting to call ${toolCall.function.name} with similar arguments to a previous call made ${timeDesc}. 
+          
+Previous call details:
+Tool: ${similarCall.toolName}
+Arguments: ${JSON.stringify(similarCall.args, null, 2)}
+Result: ${similarCall.result}
+
+If you're intentionally repeating this operation, please proceed. Otherwise, consider if this is necessary or if you might be duplicating a previous action.`,
+          requiresReentry: true,
+        };
+      }
+    }
+
     // Set thinking text based on the handler
     const thinkingText = handler.getThinkingText(args);
 
@@ -161,6 +207,57 @@ async function processToolCall(
         WHERE id = ${messageId}
       `;
 
+      // Store both the tool call and a system message
+      // Extract entity information for better tracking
+      let entityId = 'none';
+      let entityName = toolCall.function.name;
+      let entityType = 'none';
+
+      // Extract entity info from common tools
+      if (toolCall.function.name === 'create_todo_list' && result.systemMessage) {
+        const match = result.systemMessage.match(/ID: ([a-f0-9-]+)/i);
+        if (match) entityId = match[1];
+
+        const nameMatch = result.systemMessage.match(/list: "([^"]+)"/i);
+        if (nameMatch) entityName = nameMatch[1];
+
+        entityType = 'list';
+      } else if (toolCall.function.name === 'create_todo_item' && result.systemMessage) {
+        const match = result.systemMessage.match(/ID: ([a-f0-9-]+)/i);
+        if (match) entityId = match[1];
+
+        const nameMatch = result.systemMessage.match(/item: "([^"]+)"/i);
+        if (nameMatch) entityName = nameMatch[1];
+
+        entityType = 'item';
+      } else if (toolCall.function.name === 'update_todo_item' && args && (args as any).item_id) {
+        entityId = (args as any).item_id;
+        entityType = 'item';
+
+        if (result.systemMessage) {
+          const nameMatch = result.systemMessage.match(/todo item "([^"]+)"/i);
+          if (nameMatch) entityName = nameMatch[1];
+        }
+      }
+
+      // Store tool call for future reference
+      await storeToolCall(
+        chatId,
+        toolCall.function.name,
+        args,
+        result.systemMessage || 'Success',
+        entityId,
+        entityName,
+        entityType
+      );
+
+      // Store system message for context history if there's a system message
+      if (result.systemMessage) {
+        // Prepend with tool information for better context
+        const contextMessage = `TOOL EXECUTION [${handler.name}]: ${result.systemMessage}`;
+        await storeSystemMessage(chatId, contextMessage);
+      }
+
       return result;
     } catch (error) {
       console.error(`Error processing ${toolCall.function.name}:`, error);
@@ -172,6 +269,21 @@ async function processToolCall(
         SET thinking_text = ''
         WHERE id = ${messageId}
       `;
+
+      // Store error as system message for context
+      const errorContext = `TOOL ERROR [${handler.name}]: ${errorMessage}`;
+      await storeSystemMessage(chatId, errorContext);
+
+      // Track the error
+      await storeToolCall(
+        chatId,
+        toolCall.function.name,
+        args,
+        `Error: ${errorMessage}`,
+        'none',
+        toolCall.function.name,
+        'error'
+      );
 
       return { content: `\n\nError processing ${toolCall.function.name}: ${errorMessage}` };
     }
@@ -187,6 +299,26 @@ async function processToolCall(
     `;
 
     return { content: `\n\nError processing tool call: ${errorMessage}` };
+  }
+}
+
+// Add a function to retrieve system messages from the database
+async function fetchSystemMessages(chatId: string): Promise<ChatCompletionSystemMessageParam[]> {
+  try {
+    const systemMessages = await db`
+      SELECT content, created_at
+      FROM messages
+      WHERE chat_id = ${chatId} AND role = 'system'
+      ORDER BY created_at ASC
+    `;
+
+    return systemMessages.map(msg => ({
+      role: 'system' as const,
+      content: msg.content,
+    }));
+  } catch (error) {
+    console.error('Error fetching system messages:', error);
+    return []; // Return empty array on error
   }
 }
 
@@ -267,12 +399,96 @@ async function processAIStream(
     electricChats.add(chatId);
   }
 
+  // Get any stored system messages from previous interactions
+  const storedSystemMessages = recursionDepth === 0 ? await fetchSystemMessages(chatId) : [];
+
+  // Add a boundary system message if this is a new conversation (not recursion)
+  if (recursionDepth === 0) {
+    // Get recent todo lists and items for context
+    const recentLists = await db`
+      SELECT * FROM todo_lists ORDER BY updated_at DESC LIMIT 5
+    `;
+
+    const recentItems = await db`
+      SELECT i.*, l.name as list_name 
+      FROM todo_items i
+      JOIN todo_lists l ON i.list_id = l.id
+      ORDER BY i.updated_at DESC LIMIT 10
+    `;
+
+    // Get recent actions for context
+    const recentActions = await getRecentActions(chatId, 10);
+
+    // Find the most recently created or updated list or item
+    let mostRecentContext = 'todo management';
+    if (recentActions.length > 0) {
+      mostRecentContext = formatActionDescription(recentActions[0]);
+    }
+
+    // Create a boundary message that summarizes context
+    const boundaryMessage = {
+      role: 'system' as const,
+      content: `
+=== CURRENT CONTEXT STATE ===
+
+Todo Lists:
+${recentLists.map((l: any) => `- "${l.name}" (ID: ${l.id})`).join('\n')}
+
+Recent Items:
+${recentItems.map((i: any) => `- ${i.done ? '✓' : '□'} "${i.task}" (ID: ${i.id}, List: "${i.list_name}")`).join('\n')}
+
+Recent Actions:
+${recentActions.map((a: any) => `- ${formatActionDescription(a)}`).join('\n')}
+
+Current Context: You're helping with todo list management. The most recent interaction was about "${mostRecentContext}".
+
+=== END OF CONTEXT STATE ===
+`,
+    };
+
+    // Add the boundary message for context
+    if (recentLists.length > 0 || recentItems.length > 0 || recentActions.length > 0) {
+      storedSystemMessages.push(boundaryMessage);
+    }
+
+    // Add previous tool operations summary if there are stored system messages
+    if (storedSystemMessages.length > 0) {
+      // Create a summary of previous tool executions
+      const toolSummaryMessage = {
+        role: 'system' as const,
+        content: `=== PREVIOUS TOOL OPERATIONS SUMMARY ===
+The following tool operations have already been performed in this conversation:
+${storedSystemMessages
+  .filter(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return content.startsWith('TOOL EXECUTION');
+  })
+  .map(msg => {
+    // Extract the important part of each stored message
+    const content = typeof msg.content === 'string' ? msg.content : '';
+    return '- ' + content.replace('TOOL EXECUTION ', '');
+  })
+  .join('\n')}
+
+Please avoid repeating these operations unless specifically requested by the user.
+=== END OF TOOL OPERATIONS SUMMARY ===`,
+      };
+
+      // Add to system messages if there are tool executions to summarize
+      if (toolSummaryMessage.content.includes('-')) {
+        storedSystemMessages.push(toolSummaryMessage);
+      }
+    }
+  }
+
   // Use base messages if provided (from recursion), otherwise create from scratch
   let messages: ChatCompletionMessageParam[] =
     baseMessages.length > 0
       ? [...baseMessages]
       : [
           systemPrompt,
+          // Add stored system messages from previous interactions, if any
+          ...storedSystemMessages,
           ...context.map(
             msg =>
               ({
@@ -474,5 +690,24 @@ async function processAIStream(
 
     // Delete tokens
     await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
+  }
+}
+
+// Add this function to store system messages for historical context
+async function storeSystemMessage(chatId: string, content: string) {
+  try {
+    const messageId = randomUUID();
+
+    await db`
+      INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
+      VALUES (${messageId}, ${chatId}, ${content}, 'System', 'system', 'completed', NOW())
+    `;
+
+    console.log(`Stored system message for context: ${content.substring(0, 50)}...`);
+    return messageId;
+  } catch (error) {
+    console.error('Error storing system message:', error);
+    // Non-critical error, so we just log it and continue
+    return null;
   }
 }

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS chats (
 );
 
 CREATE TYPE message_status AS ENUM ('pending', 'completed', 'failed', 'aborted');
-CREATE TYPE message_role AS ENUM ('user', 'agent');
+CREATE TYPE message_role AS ENUM ('user', 'agent', 'system');
 
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY,
@@ -55,3 +55,22 @@ CREATE TABLE IF NOT EXISTS todo_items (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- AI action tracking table
+CREATE TABLE IF NOT EXISTS ai_actions (
+    id UUID PRIMARY KEY,
+    chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
+    action_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    entity_name TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for faster lookups
+CREATE INDEX IF NOT EXISTS ai_actions_chat_id_idx ON ai_actions (chat_id);
+CREATE INDEX IF NOT EXISTS ai_actions_entity_id_idx ON ai_actions (entity_id);
+CREATE INDEX IF NOT EXISTS ai_actions_action_type_idx ON ai_actions (action_type);
+
+-- Create index for reverse chronological order queries
+CREATE INDEX IF NOT EXISTS ai_actions_created_at_idx ON ai_actions (created_at DESC);

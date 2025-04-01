@@ -72,4 +72,12 @@ export interface ToolHandler {
     systemMessage?: string;
     requiresReentry?: boolean;
   }>;
+
+  /**
+   * Determines if the current tool call is similar to a previous one
+   * @param currentArgs The arguments for the current tool call
+   * @param previousArgs The arguments from a previous tool call
+   * @returns True if the calls are considered similar/duplicate
+   */
+  checkIfSimilar?: (currentArgs: unknown, previousArgs: unknown) => boolean;
 }
