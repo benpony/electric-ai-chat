@@ -304,7 +304,7 @@ export default function Sidebar() {
             )}
           </Flex>
         </ScrollArea>
-        
+
         {/* Todo Lists Section - moved to bottom of sidebar */}
         <TodoLists />
 

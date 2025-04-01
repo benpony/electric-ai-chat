@@ -26,13 +26,13 @@ const TodoLists = () => {
     try {
       // Generate a UUID for the new list
       const listId = uuidv4();
-      
+
       // Start watching for the list to sync BEFORE making the API call
       const matchPromise = matchStream(stream, ['insert'], message => {
         console.log('list id', message.value.id);
         return message.value.id === listId;
       });
-      
+
       // Create the new list with the pre-generated UUID
       const newList = await createTodoList(newListName.trim(), listId);
       setNewListName('');

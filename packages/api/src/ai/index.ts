@@ -22,6 +22,7 @@ import { fileTools, fileToolHandlers } from './tools/files.js';
 import { postgresTools, postgresToolHandlers } from './tools/postgres.js';
 import { processStreamChunks } from './stream.js';
 import { model } from '../utils.js';
+import { todoTools, todoToolHandlers } from './tools/todo.js';
 
 export { generateChatName };
 export const ENABLE_AI = true;
@@ -37,6 +38,7 @@ const allToolHandlers = [
   ...electricToolHandlers,
   ...fileToolHandlers,
   ...postgresToolHandlers,
+  ...todoToolHandlers,
 ];
 const toolHandlerMap = new Map<string, ToolHandler>();
 allToolHandlers.forEach(handler => {
@@ -193,8 +195,31 @@ async function processAIStream(
   chatId: string,
   messageId: string,
   context: ChatMessage[],
-  dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+  dbUrlParam?: { redactedUrl: string; redactedId: string; password: string },
+  recursionDepth: number = 0,
+  baseMessages: ChatCompletionMessageParam[] = [],
+  accumulatedContent: string = '',
+  currentTokenNumber: number = 0,
+  currentTokenBuffer: string = '',
+  currentLastInsertTime: number = Date.now()
 ) {
+  // Limit recursion depth to prevent infinite loops
+  const MAX_RECURSION_DEPTH = 10;
+  if (recursionDepth > MAX_RECURSION_DEPTH) {
+    console.log(`Reached maximum recursion depth (${MAX_RECURSION_DEPTH}), stopping`);
+
+    // Update the message with the accumulated content
+    await db`
+      UPDATE messages
+      SET status = 'completed', content = ${accumulatedContent + '\n\nReached maximum number of tool calls.'}
+      WHERE id = ${messageId}
+    `;
+
+    // Delete tokens
+    await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
+    return;
+  }
+
   // This abort controller is used to abort the message stream but also to
   // cancel the OpenAI stream when the message is aborted.
   const abortController = new AbortController();
@@ -242,24 +267,27 @@ async function processAIStream(
     electricChats.add(chatId);
   }
 
-  // Convert chat history to OpenAI format
-  const messages: ChatCompletionMessageParam[] = [
-    systemPrompt,
-    ...context.map(
-      msg =>
-        ({
-          role: msg.role === 'agent' ? 'assistant' : ('user' as const),
-          content: msg.content,
-        }) as ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam
-    ),
-    {
-      role: 'assistant',
-      content: '',
-    },
-  ];
+  // Use base messages if provided (from recursion), otherwise create from scratch
+  let messages: ChatCompletionMessageParam[] =
+    baseMessages.length > 0
+      ? [...baseMessages]
+      : [
+          systemPrompt,
+          ...context.map(
+            msg =>
+              ({
+                role: msg.role === 'agent' ? 'assistant' : ('user' as const),
+                content: msg.content,
+              }) as ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam
+          ),
+          {
+            role: 'assistant',
+            content: '',
+          },
+        ];
 
-  // If this is an ElectricSQL chat, add the full documentation
-  if (electricChats.has(chatId)) {
+  // If this is an ElectricSQL chat and we're not in a recursive call, add the full documentation
+  if (electricChats.has(chatId) && recursionDepth === 0) {
     const docs = await fetchElectricDocs();
     if (docs) {
       // Only add docs if we're not already close to the token limit
@@ -284,14 +312,15 @@ async function processAIStream(
     }
   }
 
-  let tokenNumber = 0;
-  let fullContent = '';
+  // Initialize or reuse state from previous recursive calls
+  let tokenNumber = currentTokenNumber;
+  let fullContent = accumulatedContent;
   let toolCalls: ToolCall[] = [];
-  let tokenBuffer = '';
-  let lastInsertTime = Date.now();
+  let tokenBuffer = currentTokenBuffer;
+  let lastInsertTime = currentLastInsertTime;
 
   // Combine all tools
-  const tools = [...basicTools, ...electricTools, ...fileTools, ...postgresTools];
+  const tools = [...basicTools, ...electricTools, ...fileTools, ...postgresTools, ...todoTools];
 
   try {
     // Call OpenAI with streaming
@@ -349,6 +378,9 @@ async function processAIStream(
       }
     }
 
+    // Collect system messages for the next recursive call
+    const systemMessages: ChatCompletionSystemMessageParam[] = [];
+
     // Process any tool calls
     for (const toolCall of toolCalls) {
       const result = await processToolCall(toolCall, chatId, messageId, dbUrlParam);
@@ -359,53 +391,88 @@ async function processAIStream(
         tokenBuffer += result.content;
       }
 
-      // If the tool requires re-entry into the stream with context
-      if (result.requiresReentry && result.systemMessage) {
-        // Add the context as a system message
-        messages.push({
+      // If the tool result includes a system message, add it to the collection
+      if (result.systemMessage) {
+        systemMessages.push({
           role: 'system',
           content: result.systemMessage,
         } as ChatCompletionSystemMessageParam);
-
-        // Get a new completion with the updated context
-        const completion = await openai.chat.completions.create({
-          model,
-          messages,
-          stream: true,
-          tools,
-          tool_choice: 'auto',
-          max_tokens: 4000, // Limit response size
-        });
-
-        // Process the new stream
-        const streamResult = await processStreamChunks(
-          completion,
-          messageId,
-          tokenNumber,
-          tokenBuffer,
-          lastInsertTime
-        );
-
-        fullContent += streamResult.fullContent;
-        tokenNumber = streamResult.tokenNumber;
-        tokenBuffer = streamResult.tokenBuffer;
-        lastInsertTime = streamResult.lastInsertTime;
       }
+    }
+
+    // If we have new system messages from tool calls, make a recursive call
+    if (systemMessages.length > 0) {
+      // Create a new messages array with all previous messages plus the new system messages
+      const nextMessages = [...messages, ...systemMessages];
+
+      // Show a thinking state
+      await db`
+        UPDATE messages
+        SET thinking_text = 'Processing tool results and continuing...'
+        WHERE id = ${messageId}
+      `;
+
+      // Update with current progress
+      if (tokenBuffer.length > 0) {
+        await db`
+          INSERT INTO tokens (message_id, token_number, token_text)
+          VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
+        `;
+        tokenNumber++;
+        tokenBuffer = '';
+        lastInsertTime = Date.now();
+      }
+
+      // Make a recursive call
+      console.log(
+        `Making recursive call at depth ${recursionDepth + 1} with ${systemMessages.length} new system messages`
+      );
+
+      return processAIStream(
+        chatId,
+        messageId,
+        context,
+        dbUrlParam,
+        recursionDepth + 1,
+        nextMessages,
+        fullContent,
+        tokenNumber,
+        tokenBuffer,
+        lastInsertTime
+      );
+    } else {
+      // No more tool calls, finalize the message
+      if (tokenBuffer.length > 0) {
+        await db`
+          INSERT INTO tokens (message_id, token_number, token_text)
+          VALUES (${messageId}, ${tokenNumber}, ${tokenBuffer})
+        `;
+      }
+
+      // Update the message with the final content
+      await db`
+        UPDATE messages
+        SET status = 'completed', content = ${fullContent}, thinking_text = ''
+        WHERE id = ${messageId}
+      `;
+
+      // Delete tokens
+      await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
     }
   } catch (error) {
     console.error('Error processing AI stream:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     fullContent += `\n\nError processing AI stream: ${errorMessage}`;
     tokenBuffer += `\n\nError processing AI stream: ${errorMessage}`;
+
+    // Update the message with error content
+    await db`
+      UPDATE messages
+      SET status = 'completed', content = ${fullContent}, thinking_text = ''
+      WHERE id = ${messageId}
+    `;
+
+    // Delete tokens
+    await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
   }
-
-  // Update the message with the processed content
-  await db`
-    UPDATE messages
-    SET status = 'completed', content = ${fullContent}
-    WHERE id = ${messageId}
-  `;
-
-  // Delete tokens
-  await db`DELETE FROM tokens WHERE message_id = ${messageId}`;
 }

@@ -1,6 +1,6 @@
 import { ChatMessage } from './types.js';
 
-export const model = 'gpt-4o-mini';
+export const model = 'gpt-4o'; // 'gpt-4o-mini'
 
 export function rowToChatMessage(row: any): ChatMessage {
   return {

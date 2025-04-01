@@ -291,7 +291,7 @@ app.get('/api/todo-lists', async (c: Context) => {
       FROM todo_lists
       ORDER BY created_at DESC
     `;
-    
+
     return c.json({ todoLists: lists });
   } catch (err) {
     console.error('Error fetching todo lists:', err);
@@ -311,7 +311,7 @@ app.post('/api/todo-lists', async (c: Context) => {
   try {
     // Use provided ID or generate a new one
     const listId = id || randomUUID();
-    
+
     const [todoList] = await db`
       INSERT INTO todo_lists (id, name, created_at, updated_at)
       VALUES (${listId}, ${name}, NOW(), NOW())
@@ -410,7 +410,7 @@ app.post('/api/todo-lists/:listId/items', async (c: Context) => {
     }
 
     const itemId = randomUUID();
-    
+
     const [todoItem] = await db`
       INSERT INTO todo_items (id, list_id, task, done, order_key, created_at, updated_at)
       VALUES (${itemId}, ${listId}, ${task}, false, ${order_key}, NOW(), NOW())
@@ -451,7 +451,7 @@ app.patch('/api/todo-items/:id', async (c: Context) => {
     console.log(`Updating item ${itemId}:`, updates);
 
     // Use a transaction to ensure atomic update
-    const updatedItem = await db.begin(async (sql) => {
+    const updatedItem = await db.begin(async sql => {
       if (updates.task !== undefined) {
         await sql`
           UPDATE todo_items

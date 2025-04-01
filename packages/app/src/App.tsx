@@ -40,10 +40,7 @@ const rootRoute = createRootRoute({
       // Add storage event listener to detect changes from other tabs
       window.addEventListener('storage', checkAuth);
 
-      Promise.all([
-        preloadChats(),
-        preloadTodoLists()
-      ]).then(() => {
+      Promise.all([preloadChats(), preloadTodoLists()]).then(() => {
         setLoading(false);
       });
 
