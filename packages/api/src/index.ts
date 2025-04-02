@@ -163,6 +163,30 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
         return { error: 'Chat not found', status: 404 };
       }
 
+      // Get all messages for context before aborting pending messages
+      const rawMessages = await sql`
+        SELECT 
+          m.id, 
+          CASE 
+            WHEN m.status = 'pending' AND tokens_content IS NOT NULL THEN tokens_content
+            ELSE m.content
+          END as content,
+          m.user_name, 
+          m.role, 
+          m.status, 
+          m.created_at, 
+          m.updated_at
+        FROM messages m
+        LEFT JOIN LATERAL (
+          SELECT string_agg(token_text, '') as tokens_content
+          FROM tokens 
+          WHERE message_id = m.id
+          GROUP BY message_id
+        ) t ON m.status = 'pending'
+        WHERE m.chat_id = ${chatId}
+        ORDER BY m.created_at ASC
+      `;
+
       // Abort any pending messages in this chat
       await sql`
         UPDATE messages
@@ -181,7 +205,7 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
         RETURNING id, content, user_name, role, status, created_at
       `;
 
-      return { newMessage };
+      return { newMessage, rawMessages };
     });
 
     // Handle transaction result
@@ -199,15 +223,8 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
       );
     }
 
-    // Get all messages for context
-    const messages = (
-      await db`
-        SELECT id, content, user_name, role, status, created_at, updated_at
-        FROM messages
-        WHERE chat_id = ${chatId}
-        ORDER BY created_at ASC
-      `
-    ).sort((a, b) => {
+    // Sort messages for proper context
+    const messages = result.rawMessages!.sort((a, b) => {
       // If both messages are from agent, compare by updated_at
       if (a.role === 'agent' && b.role === 'agent') {
         const timeA = a.updated_at.getTime();
@@ -223,11 +240,8 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
       return a.created_at.getTime() - b.created_at.getTime();
     });
 
-    console.log('==================== messages ====================');
-    console.log('');
-    console.log(JSON.stringify(messages, null, 2));
-    console.log('');
-    console.log('==================================================');
+    // Add the newly created user message to the message list
+    messages.push(result.newMessage!);
 
     // Create AI response (will create a pending message and process in background)
     const aiMessage = await createAIResponse(chatId, messages, dbUrl);
@@ -235,7 +249,7 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
     // Return both the user message and the pending AI message
     return c.json(
       {
-        messages: [rowToChatMessage(result.newMessage), aiMessage],
+        messages: [rowToChatMessage(result.newMessage!), aiMessage],
       },
       201
     );
