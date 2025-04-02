@@ -326,6 +326,7 @@ function PendingMessage({ message }: { message: Message }) {
   return (
     <Box
       position="relative"
+      px="6"
       style={{
         width: 'min(100%, 800px)',
         isolation: 'isolate',
@@ -334,7 +335,7 @@ function PendingMessage({ message }: { message: Message }) {
       <StopButton onStop={handleAbort} isAborting={isAborting} />
       <MarkdownMessage content={tokenText || ''} />
       {showThinking && (
-        <Box px="6" style={{ marginTop: '0.5em' }}>
+        <Box style={{ marginTop: '0.5em' }}>
           <Text
             color="gray"
             size="2"
