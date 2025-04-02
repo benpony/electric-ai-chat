@@ -97,18 +97,14 @@ export async function createAIResponse(
 
 // Helper function to limit context size
 function limitContextSize(messages: ChatMessage[]): ChatMessage[] {
-  // Keep the system prompt and the most recent messages
-  const systemPrompt = messages[0];
-  const recentMessages = messages.slice(1);
-
   // Estimate tokens (rough approximation)
   let totalTokens = 0;
   const maxTokens = 20000; // More conservative limit to leave room for response
-  const limitedMessages: ChatMessage[] = [systemPrompt];
+  const limitedMessages: ChatMessage[] = [];
 
   // Add messages from most recent to oldest until we hit the token limit
-  for (let i = recentMessages.length - 1; i >= 0; i--) {
-    const message = recentMessages[i];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
     // More conservative estimate: 1 token ≈ 3 characters
     const messageTokens = Math.ceil(message.content.length / 3);
 
@@ -560,6 +556,13 @@ Please avoid repeating these operations unless specifically requested by the use
     });
     const stream = await streamPromise;
 
+    // Update the message to pending status and ensure the updated_at is set to now
+    await db`
+      UPDATE messages
+      SET status = 'pending', updated_at = NOW()
+      WHERE id = ${messageId}
+    `;
+
     // Process each chunk as it arrives
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content || '';
@@ -725,7 +728,7 @@ Please avoid repeating these operations unless specifically requested by the use
         // Update the message with the final content
         await db`
           UPDATE messages
-          SET status = 'completed', 
+          SET status = CASE WHEN status != 'aborted' THEN 'completed' ELSE status END,
               content = ${fullContent}, 
               thinking_text = '',
               updated_at = NOW()

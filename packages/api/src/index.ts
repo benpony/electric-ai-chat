@@ -152,42 +152,82 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
   }
 
   try {
-    // Verify chat exists
-    const [chat] = await db`
-      SELECT id FROM chats WHERE id = ${chatId}
-    `;
+    // Use a transaction to ensure atomic operations
+    const result = await db.begin(async sql => {
+      // Verify chat exists
+      const [chat] = await sql`
+        SELECT id FROM chats WHERE id = ${chatId}
+      `;
 
-    if (!chat) {
-      return c.json({ error: 'Chat not found' }, 404);
+      if (!chat) {
+        return { error: 'Chat not found', status: 404 };
+      }
+
+      // Abort any pending messages in this chat
+      await sql`
+        UPDATE messages
+        SET status = 'aborted'
+        WHERE chat_id = ${chatId}
+        AND status = 'pending'
+      `;
+
+      // Generate UUID for the message
+      const messageId = randomUUID();
+
+      // Add user message to chat
+      const [newMessage] = await sql`
+        INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
+        VALUES (${messageId}, ${chatId}, ${message}, ${user}, 'user', 'completed', NOW())
+        RETURNING id, content, user_name, role, status, created_at
+      `;
+
+      return { newMessage };
+    });
+
+    // Handle transaction result
+    if (result.error) {
+      return c.json({ error: result.error }, result.status);
     }
-
-    // Generate UUID for the message
-    const messageId = randomUUID();
-
-    // Add user message to chat
-    const [newMessage] = await db`
-      INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
-      VALUES (${messageId}, ${chatId}, ${message}, ${user}, 'user', 'completed', NOW())
-      RETURNING id, content, user_name, role, status, created_at
-    `;
 
     // If AI is disabled, return the user message only
     if (!ENABLE_AI) {
       return c.json(
         {
-          messages: [rowToChatMessage(newMessage)],
+          messages: [rowToChatMessage(result.newMessage)],
         },
         201
       );
     }
 
     // Get all messages for context
-    const messages = await db`
-      SELECT id, content, user_name, role, status, created_at
-      FROM messages
-      WHERE chat_id = ${chatId}
-      ORDER BY created_at ASC
-    `;
+    const messages = (
+      await db`
+        SELECT id, content, user_name, role, status, created_at, updated_at
+        FROM messages
+        WHERE chat_id = ${chatId}
+        ORDER BY created_at ASC
+      `
+    ).sort((a, b) => {
+      // If both messages are from agent, compare by updated_at
+      if (a.role === 'agent' && b.role === 'agent') {
+        const timeA = a.updated_at.getTime();
+        const timeB = b.updated_at.getTime();
+        if (timeA === timeB) {
+          // If timestamps equal, pending messages come after non-pending
+          if (a.status === 'pending' && b.status !== 'pending') return 1;
+          if (a.status !== 'pending' && b.status === 'pending') return -1;
+        }
+        return timeA - timeB;
+      }
+      // Otherwise compare by created_at
+      return a.created_at.getTime() - b.created_at.getTime();
+    });
+
+    console.log('==================== messages ====================');
+    console.log('');
+    console.log(JSON.stringify(messages, null, 2));
+    console.log('');
+    console.log('==================================================');
 
     // Create AI response (will create a pending message and process in background)
     const aiMessage = await createAIResponse(chatId, messages, dbUrl);
@@ -195,7 +235,7 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
     // Return both the user message and the pending AI message
     return c.json(
       {
-        messages: [rowToChatMessage(newMessage), aiMessage],
+        messages: [rowToChatMessage(result.newMessage), aiMessage],
       },
       201
     );

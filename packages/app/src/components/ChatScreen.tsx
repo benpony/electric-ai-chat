@@ -129,7 +129,21 @@ const MessageList = memo(
           ref={scrollContentRef}
         >
           {messages
-            .sort((a, b) => a.updated_at.getTime() - b.updated_at.getTime())
+            .sort((a, b) => {
+              // If both messages are from agent, compare by updated_at
+              if (a.role === 'agent' && b.role === 'agent') {
+                const timeA = a.updated_at.getTime();
+                const timeB = b.updated_at.getTime();
+                if (timeA === timeB) {
+                  // If timestamps equal, pending messages come after non-pending
+                  if (a.status === 'pending' && b.status !== 'pending') return 1;
+                  if (a.status !== 'pending' && b.status === 'pending') return -1;
+                }
+                return timeA - timeB;
+              }
+              // Otherwise compare by created_at
+              return a.created_at.getTime() - b.created_at.getTime();
+            })
             .map(msg => (
               <Flex
                 key={msg.id}
@@ -166,6 +180,13 @@ const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { chatId } = useParams({ from: '/chat/$chatId' });
 
+  // Focus input on mount
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [chatId]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || isLoading) return;
@@ -174,6 +195,9 @@ const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
     const { message: processedMessage, dbUrl } = processDatabaseUrl(message, chatId);
     onSubmit(processedMessage, dbUrl);
     setMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
   };
 
   // Auto-resize textarea as content grows

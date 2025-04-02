@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Box, Flex, Text, Heading, TextArea, IconButton } from '@radix-ui/themes';
 import { Send, Menu } from 'lucide-react';
@@ -17,6 +17,14 @@ export default function NewChatScreen() {
   const username = localStorage.getItem('username') || 'User';
   const { stream } = useChatsShape();
   const { toggleSidebar } = useSidebar();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Focus input on mount
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -123,6 +131,7 @@ export default function NewChatScreen() {
               onChange={e => setPrompt(e.target.value)}
               placeholder="Type a message to start a chat..."
               size="3"
+              ref={inputRef}
               style={{
                 height: '240px',
                 width: '100%',
