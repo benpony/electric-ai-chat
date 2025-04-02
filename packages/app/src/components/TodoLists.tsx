@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useMatchRoute } from '@tanstack/react-router';
-import { Flex, Text, Button, Dialog, TextField } from '@radix-ui/themes';
+import { Flex, Text, Button, Dialog, TextField, Box } from '@radix-ui/themes';
 import { useTodoListsShape } from '../shapes';
 import { createTodoList } from '../api';
 import { matchStream } from '@electric-sql/experimental';
@@ -52,9 +52,9 @@ const TodoLists = () => {
   };
 
   return (
-    <Flex direction="column" gap="2" my="2" style={{ borderTop: '1px solid var(--gray-5)' }}>
+    <Flex direction="column" gap="2" my="0" pb="2" style={{ borderTop: '1px solid var(--gray-5)' }}>
       <Flex direction="column" px="3" py="1">
-        <Flex justify="between" py="3" align="center">
+        <Flex justify="between" py="3" px="1" align="center">
           <Text size="1" color="gray" weight="medium">
             TODO LISTS
           </Text>
@@ -108,9 +108,11 @@ const TodoLists = () => {
         </Dialog.Root>
 
         {todoLists.length === 0 ? (
-          <Text size="1" color="gray" style={{ paddingLeft: '12px' }}>
-            No lists yet
-          </Text>
+          <Box px="1">
+            <Text size="1" color="gray">
+              No lists yet
+            </Text>
+          </Box>
         ) : (
           todoLists.map(list => (
             <Button
@@ -119,6 +121,7 @@ const TodoLists = () => {
               color="gray"
               size="1"
               my="1"
+              mx="1"
               style={{
                 justifyContent: 'flex-start',
                 height: '22px',

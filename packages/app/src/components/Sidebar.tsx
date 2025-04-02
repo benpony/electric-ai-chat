@@ -26,6 +26,7 @@ function ChatButton({ chat, isActive, onClick }: ChatButtonProps) {
       color="gray"
       size="1"
       my="1"
+      mx="1"
       style={{
         justifyContent: 'flex-start',
         height: '22px',
@@ -260,7 +261,7 @@ export default function Sidebar() {
           <Flex direction="column" px="3" py="1">
             {/* Pinned chats header */}
             {pinnedChats.length > 0 && (
-              <Box py="2">
+              <Box py="2" px="1">
                 <Text size="1" color="gray" weight="medium">
                   PINNED CHATS
                 </Text>
@@ -278,7 +279,7 @@ export default function Sidebar() {
             ))}
 
             {/* Recent Chats header */}
-            <Box py="2">
+            <Box py="2" px="1">
               <Text size="1" color="gray" weight="medium">
                 RECENT CHATS
               </Text>
