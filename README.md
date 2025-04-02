@@ -12,6 +12,7 @@ This project demonstrates:
   - Live updates of AI-generated or modified files
   - Immediate visibility of tool actions across all clients
 - Controlling the LLM process via ElectricSQL propagating the `stop` status to the agent process when a user clicks the stop button.
+- Todo List functionality with real-time collaborative editing and LLM automation
 
 ## Outline
 
@@ -99,6 +100,21 @@ Electric AI Chat implements several LLM tools to enhance the AI assistant capabi
    - Automatically generate descriptive chat names based on content
    - Rename chats with user-specified names
    - Pin/unpin chats for easier organization
+
+5. **Todo List Tools**
+   - Create, update, delete, and manage collaborative todo lists
+   - Bidirectional real-time synchronization of todo items across all clients
+   - LLM-powered todo processing with the ability to:
+     - Process entire todo lists automatically
+     - Watch lists for new items and process them as they're added
+     - Respond to task completion status changes in real-time
+     - Use ElectricSQL's shape streams to monitor tasks without polling
+   - Todo items can be created by users or the AI, demonstrating real-time collaboration
+   - Demonstrates practical uses of ElectricSQL for:
+     - Event-driven architectures with shape streams
+     - Real-time UI updates across multiple clients
+     - Reactive programming patterns with AI integrations
+     - Resumable operations that can survive page reloads or connection interruptions
 
 ## ElectricSQL Benefits for AI Applications
 
@@ -190,10 +206,10 @@ ai-chat/
 - Offline capability with ElectricSQL
 - Responsive design
 - Light and dark theme support
-
-## API Endpoints
-
-- `POST /api/chats` - Create a new chat
-- `POST /api/chats/:id/messages` - Add a message to a chat
-
-See the API documentation in packages/api/README.md for more details.
+- Todo List Management
+  - Create and manage multiple todo lists
+  - Real-time collaborative editing of todo items
+  - Mark items as complete/incomplete with instant sync
+  - AI-assisted task automation via LLM tools
+  - Watch mode for continuous task processing
+  - Event-driven architecture using ElectricSQL shape streams
