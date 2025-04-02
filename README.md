@@ -97,6 +97,7 @@ Electric AI Chat implements several LLM tools to enhance the AI assistant capabi
    - Persist files in the database for cross-session access
 
 4. **Chat Management Tools**
+
    - Automatically generate descriptive chat names based on content
    - Rename chats with user-specified names
    - Pin/unpin chats for easier organization

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { cors } from 'hono/cors';
+import { proxy } from 'hono/proxy';
 import type { Context } from 'hono';
 import { randomUUID } from 'crypto';
 import { db } from './db.js';
@@ -8,20 +9,66 @@ import { rowToChatMessage } from './utils.js';
 import { Chat, CreateChatRequest, CreateMessageRequest } from './types.js';
 import { createAIResponse, generateChatName, ENABLE_AI } from './ai/index.js';
 
+// Access the Electric API URL
+const ELECTRIC_API_URL = process.env.ELECTRIC_API_URL || 'http://localhost:3000';
+
 const app = new Hono();
 
 // Enable CORS
 app.use(
   '/*',
   cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    origin: [
+      'http://localhost:5173',
+      'https://localhost:5173',
+      'http://localhost:3000',
+      'https://localhost:3000',
+      'http://localhost:3001',
+      'https://localhost:3001',
+      'http://localhost:3002',
+      'https://localhost:3002',
+    ],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowHeaders: ['Content-Type', 'Authorization'],
-    exposeHeaders: ['Content-Length', 'X-Kuma-Revision'],
+    exposeHeaders: [
+      'Content-Length',
+      'X-Kuma-Revision',
+      'electric-offset',
+      'electric-handle',
+      'electric-schema',
+      'electric-cursor',
+      'electric-up-to-date',
+    ],
     maxAge: 600,
     credentials: true,
   })
 );
+
+app.get('/test', async c => {
+  console.log('Hello, world!');
+  return c.json({ message: 'Hello, world!' });
+});
+
+// Proxy endpoint for Electric shape API
+app.get('/shape', async c => {
+  // This is where you can perform any custom authentication of your shapes.
+  const request = c.req.raw;
+  const originUrl = new URL(`${ELECTRIC_API_URL}/v1/shape`);
+
+  const url = new URL(request.url);
+  url.searchParams.forEach((value, key) => {
+    originUrl.searchParams.set(key, value);
+  });
+
+  const response = await proxy(originUrl.toString(), {
+    ...request,
+    headers: {
+      ...request.headers,
+    },
+  });
+
+  return response;
+});
 
 // Get chat messages
 app.get('/api/chats/:id', async (c: Context) => {

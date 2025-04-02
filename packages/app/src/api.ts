@@ -73,6 +73,14 @@ export interface UpdateTodoItemRequest {
 // API client
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+// Common fetch options for all API requests
+const commonFetchOptions = {
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  credentials: 'include' as RequestCredentials,
+};
+
 /**
  * Create a new chat with an initial message
  */
@@ -86,9 +94,7 @@ export async function createChat(
 
   const response = await fetch(`${API_URL}/api/chats`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    ...commonFetchOptions,
     body: JSON.stringify(payload),
   });
 
@@ -114,9 +120,7 @@ export async function addMessage(
 
   const response = await fetch(`${API_URL}/api/chats/${chatId}/messages`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    ...commonFetchOptions,
     body: JSON.stringify(payload),
   });
 
@@ -134,9 +138,7 @@ export async function addMessage(
 export async function abortMessage(messageId: string): Promise<{ success: boolean }> {
   const response = await fetch(`${API_URL}/api/messages/${messageId}/abort`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    ...commonFetchOptions,
   });
 
   if (!response.ok) {
@@ -155,9 +157,7 @@ export async function createTodoList(name: string, id?: string): Promise<TodoLis
 
   const response = await fetch(`${API_URL}/api/todo-lists`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    ...commonFetchOptions,
     body: JSON.stringify(payload),
   });
 
@@ -176,9 +176,7 @@ export async function createTodoList(name: string, id?: string): Promise<TodoLis
 export async function deleteTodoList(listId: string): Promise<{ success: boolean }> {
   const response = await fetch(`${API_URL}/api/todo-lists/${listId}`, {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    ...commonFetchOptions,
   });
 
   if (!response.ok) {
@@ -201,9 +199,7 @@ export async function createTodoItem(
 
   const response = await fetch(`${API_URL}/api/todo-lists/${listId}/items`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    ...commonFetchOptions,
     body: JSON.stringify(payload),
   });
 
@@ -225,9 +221,7 @@ export async function updateTodoItem(
 ): Promise<TodoItem> {
   const response = await fetch(`${API_URL}/api/todo-items/${itemId}`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    ...commonFetchOptions,
     body: JSON.stringify(updates),
   });
 
@@ -246,9 +240,7 @@ export async function updateTodoItem(
 export async function deleteTodoItem(itemId: string): Promise<{ success: boolean }> {
   const response = await fetch(`${API_URL}/api/todo-items/${itemId}`, {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    ...commonFetchOptions,
   });
 
   if (!response.ok) {

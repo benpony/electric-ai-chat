@@ -246,6 +246,7 @@ export default function Sidebar() {
                 width: '100%',
                 justifyContent: 'center',
                 height: '28px',
+                color: 'var(--white)',
               }}
               onClick={handleNewChat}
             >
