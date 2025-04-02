@@ -173,12 +173,7 @@ const CodeBlock = memo(function CodeBlock({
 
 const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: string }) {
   return (
-    <Box
-      px="6"
-      style={{
-        width: 'min(100%, 800px)',
-      }}
-    >
+    <Box>
       <Flex justify="start">
         <div
           style={{
@@ -280,7 +275,16 @@ const AiResponse = memo(({ message }: { message: Message }) => {
 });
 
 function CompletedMessage({ message }: { message: Message }) {
-  return <MarkdownMessage content={message.content} />;
+  return (
+    <Box
+      px="6"
+      style={{
+        width: 'min(100%, 800px)',
+      }}
+    >
+      <MarkdownMessage content={message.content} />
+    </Box>
+  );
 }
 
 function PendingMessage({ message }: { message: Message }) {
@@ -384,11 +388,16 @@ function FailedMessage({}: { message: Message }) {
 
 function AbortedMessage({ message }: { message: Message }) {
   return (
-    <Box width="100%">
+    <Box
+      px="6"
+      style={{
+        width: 'min(100%, 800px)',
+      }}
+    >
       <MarkdownMessage content={message.content || ''} />
-      <Box px="6">
+      <Box>
         <Text color="ruby" size="2">
-          Generation stopped
+          Generation interrupted
         </Text>
       </Box>
     </Box>
