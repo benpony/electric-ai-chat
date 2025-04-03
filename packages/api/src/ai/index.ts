@@ -27,11 +27,11 @@ import {
 import { fileTools, fileToolHandlers } from './tools/files.js';
 import { postgresTools, postgresToolHandlers } from './tools/postgres.js';
 import { model } from '../utils.js';
-import { todoTools, todoToolHandlers } from './tools/todo.js';
+import { todoTools, todoToolHandlers } from './tools/todo/index.js';
+import { ELECTRIC_API_URL } from '../urls.js';
 
 export { generateChatName };
 export const ENABLE_AI = true;
-const ELECTRIC_API_URL = process.env.ELECTRIC_API_URL || 'http://localhost:3000';
 
 const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_KEY,
