@@ -72,6 +72,7 @@ export interface UpdateTodoItemRequest {
 
 export interface UpdatePresenceRequest {
   user_name: string;
+  typing?: boolean;
 }
 
 export interface UserPresence {
@@ -79,6 +80,7 @@ export interface UserPresence {
   chat_id: string;
   user_name: string;
   last_seen: Date;
+  typing: boolean;
   created_at: Date;
 }
 
@@ -268,9 +270,10 @@ export async function deleteTodoItem(itemId: string): Promise<{ success: boolean
  */
 export async function updatePresence(
   chatId: string,
-  userName: string
+  userName: string,
+  typing: boolean = false
 ): Promise<{ presence: UserPresence }> {
-  const payload: UpdatePresenceRequest = { user_name: userName };
+  const payload: UpdatePresenceRequest = { user_name: userName, typing };
 
   const response = await fetch(`${API_URL}/api/chats/${chatId}/presence`, {
     method: 'POST',

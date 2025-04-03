@@ -625,7 +625,7 @@ app.delete('/api/todo-items/:id', async (c: Context) => {
 app.post('/api/chats/:id/presence', async (c: Context) => {
   const chatId = c.req.param('id');
   const body = await c.req.json();
-  const { user_name } = body as UpdatePresenceRequest;
+  const { user_name, typing } = body as UpdatePresenceRequest;
 
   if (!user_name) {
     return c.json({ error: 'User name is required' }, 400);
@@ -633,14 +633,25 @@ app.post('/api/chats/:id/presence', async (c: Context) => {
 
   try {
     // Upsert user presence
-    const [presence] = await db`
-      INSERT INTO user_presence (id, chat_id, user_name, last_seen)
-      VALUES (${randomUUID()}, ${chatId}, ${user_name}, NOW())
-      ON CONFLICT (chat_id, user_name)
-      DO UPDATE SET
-        last_seen = NOW()
-      RETURNING id, chat_id, user_name, last_seen, created_at
-    `;
+    const [presence] =
+      typing === undefined
+        ? await db`
+          INSERT INTO user_presence (id, chat_id, user_name, last_seen)
+          VALUES (${randomUUID()}, ${chatId}, ${user_name}, NOW())
+          ON CONFLICT (chat_id, user_name)
+          DO UPDATE SET
+            last_seen = NOW()
+          RETURNING id, chat_id, user_name, last_seen, typing, created_at
+        `
+        : await db`
+          INSERT INTO user_presence (id, chat_id, user_name, last_seen, typing)
+          VALUES (${randomUUID()}, ${chatId}, ${user_name}, NOW(), ${typing})
+          ON CONFLICT (chat_id, user_name)
+          DO UPDATE SET
+            last_seen = NOW(),
+            typing = ${typing}
+          RETURNING id, chat_id, user_name, last_seen, typing, created_at
+        `;
 
     // Clean up stale presence records (older than 20 seconds)
     await db`
@@ -661,7 +672,7 @@ app.get('/api/chats/:id/presence', async (c: Context) => {
 
   try {
     const presences = await db`
-      SELECT id, chat_id, user_name, last_seen, created_at
+      SELECT id, chat_id, user_name, last_seen, typing, created_at
       FROM user_presence
       WHERE chat_id = ${chatId}
       AND last_seen > NOW() - INTERVAL '20 seconds'

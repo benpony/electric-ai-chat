@@ -82,9 +82,21 @@ CREATE TABLE IF NOT EXISTS user_presence (
     chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
     user_name TEXT NOT NULL,
     last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    typing BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (chat_id, user_name)
 );
+
+-- Ensure typing field exists (for existing installations)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'user_presence' AND column_name = 'typing'
+    ) THEN
+        ALTER TABLE user_presence ADD COLUMN typing BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;
 
 -- Index for efficient lookups by chat_id
 CREATE INDEX IF NOT EXISTS user_presence_chat_id_idx ON user_presence (chat_id);

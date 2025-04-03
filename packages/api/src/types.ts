@@ -88,9 +88,11 @@ export interface UserPresence {
   chat_id: string;
   user_name: string;
   last_seen: Date;
+  typing: boolean;
   created_at: Date;
 }
 
 export interface UpdatePresenceRequest {
   user_name: string;
+  typing?: boolean;
 }

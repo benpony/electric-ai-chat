@@ -272,6 +272,7 @@ export interface UserPresence extends MessageRow {
   chat_id: string;
   user_name: string;
   last_seen: Date;
+  typing: boolean;
   created_at: Date;
 }
 

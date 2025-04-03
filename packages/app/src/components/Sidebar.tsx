@@ -6,6 +6,7 @@ import { useTheme } from './ThemeProvider';
 import { useChatsShape } from '../shapes';
 import { useSidebar } from './SidebarProvider';
 import TodoLists from './TodoLists';
+import UserAvatar from './UserAvatar';
 
 // Chat Button Component
 type ChatButtonProps = {
@@ -115,6 +116,7 @@ function SidebarFooter({ username, theme, setTheme, handleLogout }: FooterProps)
     <Box p="2" style={{ marginTop: 'auto', borderTop: '1px solid var(--gray-5)' }}>
       <Flex align="center" justify="between" style={{ padding: '0 8px' }}>
         <Flex align="center" gap="2">
+          <UserAvatar username={username} size="small" showTooltip={false} />
           <Text size="1">{username}</Text>
         </Flex>
         <Flex gap="3">

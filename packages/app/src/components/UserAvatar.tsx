@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Box, Tooltip } from '@radix-ui/themes';
+import { Tooltip } from '@radix-ui/themes';
 
 interface UserAvatarProps {
   username: string;

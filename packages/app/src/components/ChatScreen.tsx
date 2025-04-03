@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useMemo } from 'react';
+import { useState, useEffect, useRef, memo, useMemo, useCallback } from 'react';
 import { useParams } from '@tanstack/react-router';
 import {
   Box,
@@ -20,6 +20,9 @@ import { ChatSidebar } from './ChatSidebar';
 import { processDatabaseUrl } from '../utils/db-url';
 import { getChatPasswords } from '../utils/password-store';
 import UserAvatar from './UserAvatar';
+import TypingIndicator from './TypingIndicator';
+
+const TYPING_INDICATOR_TIMEOUT = 5000;
 
 type Message = {
   id: string;
@@ -39,6 +42,7 @@ interface MessageListProps {
   scrollAreaRef: React.RefObject<HTMLDivElement>;
   scrollContentRef: React.RefObject<HTMLDivElement>;
   messagesEndRef: React.RefObject<HTMLDivElement>;
+  typingUsers: string[];
 }
 
 interface MessageInputProps {
@@ -47,6 +51,7 @@ interface MessageInputProps {
     dbUrl?: { redactedUrl: string; redactedId: string; password: string }
   ) => void;
   isLoading: boolean;
+  onTypingChange?: (isTyping: boolean) => void;
 }
 
 interface UserPromptProps {
@@ -58,7 +63,6 @@ interface UserPromptProps {
 // UserPrompt component to display user messages
 const UserPrompt = memo(({ message, isCurrentUser, multipleUsers }: UserPromptProps) => {
   const isSystemMessage = message.role === 'system';
-  const showAvatar = !isSystemMessage;
 
   return (
     <Flex
@@ -78,22 +82,12 @@ const UserPrompt = memo(({ message, isCurrentUser, multipleUsers }: UserPromptPr
           flexDirection: isCurrentUser ? 'row-reverse' : 'row',
         }}
       >
-        {multipleUsers && showAvatar && (
-          <UserAvatar username={message.user_name} size="small" showTooltip={false} />
+        {(!isCurrentUser || multipleUsers) && (
+          <div style={{ marginBottom: '-8px' }}>
+            <UserAvatar username={message.user_name} size="small" showTooltip={true} />
+          </div>
         )}
 
-        {multipleUsers && !isSystemMessage && (
-          <Text
-            size="1"
-            style={{
-              color: 'var(--gray-11)',
-              marginLeft: '-2px',
-              marginBottom: '3px',
-            }}
-          >
-            {message.user_name}
-          </Text>
-        )}
         {isSystemMessage && (
           <Text
             size="1"
@@ -136,7 +130,14 @@ const UserPrompt = memo(({ message, isCurrentUser, multipleUsers }: UserPromptPr
 
 // MessageList component to display messages
 const MessageList = memo(
-  ({ messages, username, scrollAreaRef, scrollContentRef, messagesEndRef }: MessageListProps) => {
+  ({
+    messages,
+    username,
+    scrollAreaRef,
+    scrollContentRef,
+    messagesEndRef,
+    typingUsers,
+  }: MessageListProps) => {
     const usernames = new Set(
       messages.filter(msg => msg.role === 'user').map(msg => msg.user_name)
     );
@@ -192,6 +193,12 @@ const MessageList = memo(
                 )}
               </Flex>
             ))}
+
+          {/* Show typing indicators after the messages */}
+          {typingUsers.map(user => (
+            <TypingIndicator key={`typing-${user}`} username={user} />
+          ))}
+
           <div ref={messagesEndRef} />
         </Box>
       </ScrollArea>
@@ -200,10 +207,13 @@ const MessageList = memo(
 );
 
 // MessageInput component for the form
-const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
+const MessageInput = memo(({ onSubmit, isLoading, onTypingChange }: MessageInputProps) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { chatId } = useParams({ from: '/chat/$chatId' });
+  const typingTimeoutRef = useRef<number | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const lastTypingStatus = useRef(false);
 
   // Focus input on mount
   useEffect(() => {
@@ -211,6 +221,53 @@ const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
       textareaRef.current.focus();
     }
   }, [chatId]);
+
+  // Pass the typing status to the parent when it changes
+  useEffect(() => {
+    onTypingChange?.(isTyping);
+  }, [onTypingChange]);
+
+  // Pass the typing status to the parent when it changes
+  useEffect(() => {
+    if (lastTypingStatus.current !== isTyping) {
+      lastTypingStatus.current = isTyping;
+      onTypingChange?.(isTyping);
+    }
+  }, [isTyping, onTypingChange]);
+
+  // Handle typing status
+  useEffect(() => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    if (isTyping) {
+      // They were typing, are they still typing?
+      if (message.trim().length === 0) {
+        setIsTyping(false);
+      } else {
+        typingTimeoutRef.current = setTimeout(() => {
+          setIsTyping(false);
+          typingTimeoutRef.current = null;
+        }, TYPING_INDICATOR_TIMEOUT);
+      }
+    } else {
+      // They were not typing, are they typing now?
+      if (message.trim().length > 0) {
+        setIsTyping(true);
+        typingTimeoutRef.current = setTimeout(() => {
+          setIsTyping(false);
+          typingTimeoutRef.current = null;
+        }, TYPING_INDICATOR_TIMEOUT);
+      }
+    }
+
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [message]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -220,6 +277,15 @@ const MessageInput = memo(({ onSubmit, isLoading }: MessageInputProps) => {
     const { message: processedMessage, dbUrl } = processDatabaseUrl(message, chatId);
     onSubmit(processedMessage, dbUrl);
     setMessage('');
+
+    // Clear typing status when submitting
+    if (isTyping) {
+      setIsTyping(false);
+      if (onTypingChange) {
+        onTypingChange(false);
+      }
+    }
+
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
@@ -332,6 +398,65 @@ export default function ChatScreen() {
 
   // Determine if we should show current user avatar
   const showCurrentUserAvatar = presences.filter(p => isActivePresence(p)).length > 1;
+
+  // Keep track of typing users with timeouts
+  const typingTimeoutsRef = useRef<Record<string, { timeout: number; timestamp: number }>>({});
+
+  // Get typing users with proper timeouts
+  const typingUsers = useMemo(() => {
+    const now = Date.now();
+
+    // Add new typing users and refresh existing ones
+    const activeTypingUsers = presences
+      .filter(p => isActivePresence(p) && p.typing && p.user_name !== username)
+      .map(p => {
+        const userName = p.user_name;
+
+        // If not already tracked, add a timeout
+        if (!typingTimeoutsRef.current[userName]) {
+          typingTimeoutsRef.current[userName] = {
+            timeout: window.setTimeout(() => {
+              // This will trigger a re-render to remove this user
+              const updatedTimeouts = { ...typingTimeoutsRef.current };
+              delete updatedTimeouts[userName];
+              typingTimeoutsRef.current = updatedTimeouts;
+
+              // Force re-render
+              setShouldScrollToBottom(prev => prev);
+            }, 5000),
+            timestamp: now,
+          };
+        } else {
+          // Update the timestamp
+          typingTimeoutsRef.current[userName].timestamp = now;
+        }
+
+        return userName;
+      });
+
+    // Clean up typing timeouts that are no longer active
+    Object.keys(typingTimeoutsRef.current).forEach(userName => {
+      const isUserStillTyping = activeTypingUsers.includes(userName);
+      const hasTimedOut = now - typingTimeoutsRef.current[userName].timestamp > 5000;
+
+      if (!isUserStillTyping || hasTimedOut) {
+        clearTimeout(typingTimeoutsRef.current[userName].timeout);
+        delete typingTimeoutsRef.current[userName];
+      }
+    });
+
+    // Return users who have active timeouts
+    return Object.keys(typingTimeoutsRef.current);
+  }, [presences, username]);
+
+  // Clean up typing timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(typingTimeoutsRef.current).forEach(({ timeout }) => {
+        clearTimeout(timeout);
+      });
+    };
+  }, []);
 
   // Save showSystemMessages preference to localStorage when it changes
   useEffect(() => {
@@ -452,6 +577,16 @@ export default function ChatScreen() {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, shouldScrollToBottom]);
+
+  // Function to handle typing status change
+  const handleTypingChange = useCallback(
+    (isTyping: boolean) => {
+      updatePresence(chatId, username, isTyping).catch(error => {
+        console.error('Failed to update typing status:', error);
+      });
+    },
+    [chatId, username]
+  );
 
   const handleMessageSubmit = async (messageText: string) => {
     try {
@@ -590,7 +725,7 @@ export default function ChatScreen() {
       </Flex>
 
       {/* Main content area */}
-      <Flex style={{ flex: 1, overflow: 'hidden' }}>
+      <Flex style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {/* Messages - Scrollable */}
         <Box style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
           <MessageList
@@ -599,6 +734,7 @@ export default function ChatScreen() {
             scrollAreaRef={scrollAreaRef}
             scrollContentRef={scrollContentRef}
             messagesEndRef={messagesEndRef}
+            typingUsers={typingUsers}
           />
         </Box>
 
@@ -607,7 +743,11 @@ export default function ChatScreen() {
       </Flex>
 
       {/* Message Input - Fixed */}
-      <MessageInput onSubmit={handleMessageSubmit} isLoading={isLoading} />
+      <MessageInput
+        onSubmit={handleMessageSubmit}
+        isLoading={isLoading}
+        onTypingChange={handleTypingChange}
+      />
     </Flex>
   );
 }
