@@ -1,3 +1,9 @@
+// Backend API URL
+const VITE_API_URL: string | undefined = import.meta.env.VITE_API_URL;
+export const API_URL =
+  (VITE_API_URL?.startsWith('/') ? document.location.origin + VITE_API_URL : VITE_API_URL) ||
+  'http://localhost:3001';
+
 // Types
 export interface ChatMessage {
   id: string;
@@ -84,9 +90,6 @@ export interface UserPresence {
   created_at: Date;
 }
 
-// API client
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
 // Common fetch options for all API requests
 const commonFetchOptions = {
   headers: {
@@ -106,7 +109,7 @@ export async function createChat(
 ): Promise<Chat> {
   const payload: CreateChatRequest = { message, user, id, dbUrl };
 
-  const response = await fetch(`${API_URL}/api/chats`, {
+  const response = await fetch(`${API_URL}/chats`, {
     method: 'POST',
     ...commonFetchOptions,
     body: JSON.stringify(payload),
@@ -132,7 +135,7 @@ export async function addMessage(
 ): Promise<{ messages: ChatMessage[] }> {
   const payload: CreateMessageRequest = { message, user, dbUrl };
 
-  const response = await fetch(`${API_URL}/api/chats/${chatId}/messages`, {
+  const response = await fetch(`${API_URL}/chats/${chatId}/messages`, {
     method: 'POST',
     ...commonFetchOptions,
     body: JSON.stringify(payload),
@@ -150,7 +153,7 @@ export async function addMessage(
  * Abort an in-progress AI message
  */
 export async function abortMessage(messageId: string): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_URL}/api/messages/${messageId}/abort`, {
+  const response = await fetch(`${API_URL}/messages/${messageId}/abort`, {
     method: 'POST',
     ...commonFetchOptions,
   });
@@ -169,7 +172,7 @@ export async function abortMessage(messageId: string): Promise<{ success: boolea
 export async function createTodoList(name: string, id?: string): Promise<TodoList> {
   const payload: CreateTodoListRequest = { name, id };
 
-  const response = await fetch(`${API_URL}/api/todo-lists`, {
+  const response = await fetch(`${API_URL}/todo-lists`, {
     method: 'POST',
     ...commonFetchOptions,
     body: JSON.stringify(payload),
@@ -188,7 +191,7 @@ export async function createTodoList(name: string, id?: string): Promise<TodoLis
  * Delete a todo list
  */
 export async function deleteTodoList(listId: string): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_URL}/api/todo-lists/${listId}`, {
+  const response = await fetch(`${API_URL}/todo-lists/${listId}`, {
     method: 'DELETE',
     ...commonFetchOptions,
   });
@@ -211,7 +214,7 @@ export async function createTodoItem(
 ): Promise<TodoItem> {
   const payload: CreateTodoItemRequest = { list_id: listId, task, order_key: orderKey };
 
-  const response = await fetch(`${API_URL}/api/todo-lists/${listId}/items`, {
+  const response = await fetch(`${API_URL}/todo-lists/${listId}/items`, {
     method: 'POST',
     ...commonFetchOptions,
     body: JSON.stringify(payload),
@@ -233,7 +236,7 @@ export async function updateTodoItem(
   itemId: string,
   updates: UpdateTodoItemRequest
 ): Promise<TodoItem> {
-  const response = await fetch(`${API_URL}/api/todo-items/${itemId}`, {
+  const response = await fetch(`${API_URL}/todo-items/${itemId}`, {
     method: 'PATCH',
     ...commonFetchOptions,
     body: JSON.stringify(updates),
@@ -252,7 +255,7 @@ export async function updateTodoItem(
  * Delete a todo item
  */
 export async function deleteTodoItem(itemId: string): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_URL}/api/todo-items/${itemId}`, {
+  const response = await fetch(`${API_URL}/todo-items/${itemId}`, {
     method: 'DELETE',
     ...commonFetchOptions,
   });
@@ -275,7 +278,7 @@ export async function updatePresence(
 ): Promise<{ presence: UserPresence }> {
   const payload: UpdatePresenceRequest = { user_name: userName, typing };
 
-  const response = await fetch(`${API_URL}/api/chats/${chatId}/presence`, {
+  const response = await fetch(`${API_URL}/chats/${chatId}/presence`, {
     method: 'POST',
     ...commonFetchOptions,
     body: JSON.stringify(payload),
@@ -297,7 +300,7 @@ export async function deletePresence(
   userName: string
 ): Promise<{ success: boolean }> {
   const response = await fetch(
-    `${API_URL}/api/chats/${chatId}/presence/${encodeURIComponent(userName)}`,
+    `${API_URL}/chats/${chatId}/presence/${encodeURIComponent(userName)}`,
     {
       method: 'DELETE',
       ...commonFetchOptions,

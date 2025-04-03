@@ -124,7 +124,6 @@ body {
     transform: translateX(-100%);
     transition: transform 0.3s ease-in-out;
     height: 100dvh;
-    height: -webkit-fill-available;
   }
 
   .sidebar.open {
@@ -361,12 +360,10 @@ pre:has(.syntax-highlighter) {
 @media (max-width: 768px) {
   .content-area {
     height: 100dvh;
-    height: -webkit-fill-available;
   }
 
   .sidebar {
     height: 100dvh;
-    height: -webkit-fill-available;
   }
 }
 

@@ -4,9 +4,13 @@
   "description": "Multi-user AI chat application",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter app dev",
-    "build": "pnpm --filter app build",
-    "preview": "pnpm --filter app preview",
+    "dev": "concurrently \"VITE_API_URL=/api pnpm dev:app\" \"pnpm dev:api\" \"caddy run --config Caddyfile\"",
+    "dev:app": "pnpm --filter electric-chat-app dev --host",
+    "dev:api": "pnpm --filter electric-chat-api dev",
+    "build:app": "pnpm --filter electric-chat-app build",
+    "build:api": "pnpm --filter electric-chat-api build",
+    "preview:app": "pnpm --filter electric-chat-app preview",
+    "preview:api": "pnpm --filter electric-chat-api preview",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md}\""
   },
@@ -18,5 +22,8 @@
   ],
   "devDependencies": {
     "prettier": "^3.2.4"
+  },
+  "dependencies": {
+    "concurrently": "^9.1.2"
   }
 }

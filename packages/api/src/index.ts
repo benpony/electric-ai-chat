@@ -71,7 +71,7 @@ app.get('/shape', async c => {
 });
 
 // Get chat messages
-app.get('/api/chats/:id', async (c: Context) => {
+app.get('/chats/:id', async (c: Context) => {
   const chatId = c.req.param('id');
 
   try {
@@ -105,7 +105,7 @@ app.get('/api/chats/:id', async (c: Context) => {
 });
 
 // Create a new chat
-app.post('/api/chats', async (c: Context) => {
+app.post('/chats', async (c: Context) => {
   const body = await c.req.json();
   const { message, user, id, dbUrl } = body as CreateChatRequest;
 
@@ -193,7 +193,7 @@ app.post('/api/chats', async (c: Context) => {
 });
 
 // Add message to existing chat
-app.post('/api/chats/:id/messages', async (c: Context) => {
+app.post('/chats/:id/messages', async (c: Context) => {
   const chatId = c.req.param('id');
   const body = await c.req.json();
   const { message, user, dbUrl } = body as CreateMessageRequest;
@@ -315,7 +315,7 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
 });
 
 // Abort an in-progress message
-app.post('/api/messages/:id/abort', async (c: Context) => {
+app.post('/messages/:id/abort', async (c: Context) => {
   const messageId = c.req.param('id');
 
   try {
@@ -357,7 +357,7 @@ app.post('/api/messages/:id/abort', async (c: Context) => {
 });
 
 // Pin/Unpin a chat
-app.post('/api/chats/:id/pin', async (c: Context) => {
+app.post('/chats/:id/pin', async (c: Context) => {
   const chatId = c.req.param('id');
   const body = await c.req.json();
   const { pinned } = body as { pinned: boolean };
@@ -393,7 +393,7 @@ app.post('/api/chats/:id/pin', async (c: Context) => {
 // Todo List Routes
 
 // Get all todo lists
-app.get('/api/todo-lists', async (c: Context) => {
+app.get('/todo-lists', async (c: Context) => {
   try {
     const lists = await db`
       SELECT id, name, created_at, updated_at
@@ -409,7 +409,7 @@ app.get('/api/todo-lists', async (c: Context) => {
 });
 
 // Create a new todo list
-app.post('/api/todo-lists', async (c: Context) => {
+app.post('/todo-lists', async (c: Context) => {
   const body = await c.req.json();
   const { name, id } = body as { name: string; id?: string };
 
@@ -435,7 +435,7 @@ app.post('/api/todo-lists', async (c: Context) => {
 });
 
 // Get a specific todo list with items
-app.get('/api/todo-lists/:id', async (c: Context) => {
+app.get('/todo-lists/:id', async (c: Context) => {
   const listId = c.req.param('id');
 
   try {
@@ -466,7 +466,7 @@ app.get('/api/todo-lists/:id', async (c: Context) => {
 });
 
 // Delete a todo list
-app.delete('/api/todo-lists/:id', async (c: Context) => {
+app.delete('/todo-lists/:id', async (c: Context) => {
   const listId = c.req.param('id');
 
   try {
@@ -495,7 +495,7 @@ app.delete('/api/todo-lists/:id', async (c: Context) => {
 // Todo Item Routes
 
 // Create a new todo item
-app.post('/api/todo-lists/:listId/items', async (c: Context) => {
+app.post('/todo-lists/:listId/items', async (c: Context) => {
   const listId = c.req.param('listId');
   const body = await c.req.json();
   const { task, order_key } = body as { task: string; order_key: string };
@@ -534,7 +534,7 @@ app.post('/api/todo-lists/:listId/items', async (c: Context) => {
 });
 
 // Update a todo item
-app.patch('/api/todo-items/:id', async (c: Context) => {
+app.patch('/todo-items/:id', async (c: Context) => {
   const itemId = c.req.param('id');
   const body = await c.req.json();
   const updates = body as { task?: string; done?: boolean; order_key?: string };
@@ -603,7 +603,7 @@ app.patch('/api/todo-items/:id', async (c: Context) => {
 });
 
 // Delete a todo item
-app.delete('/api/todo-items/:id', async (c: Context) => {
+app.delete('/todo-items/:id', async (c: Context) => {
   const itemId = c.req.param('id');
 
   try {
@@ -630,7 +630,7 @@ app.delete('/api/todo-items/:id', async (c: Context) => {
 });
 
 // Update user presence in a chat
-app.post('/api/chats/:id/presence', async (c: Context) => {
+app.post('/chats/:id/presence', async (c: Context) => {
   const chatId = c.req.param('id');
   const body = await c.req.json();
   const { user_name, typing } = body as UpdatePresenceRequest;
@@ -675,7 +675,7 @@ app.post('/api/chats/:id/presence', async (c: Context) => {
 });
 
 // Get active users in a chat (for debugging)
-app.get('/api/chats/:id/presence', async (c: Context) => {
+app.get('/chats/:id/presence', async (c: Context) => {
   const chatId = c.req.param('id');
 
   try {
@@ -695,7 +695,7 @@ app.get('/api/chats/:id/presence', async (c: Context) => {
 });
 
 // Delete a user's presence from a chat
-app.delete('/api/chats/:id/presence/:userName', async (c: Context) => {
+app.delete('/chats/:id/presence/:userName', async (c: Context) => {
   const chatId = c.req.param('id');
   const userName = c.req.param('userName');
 

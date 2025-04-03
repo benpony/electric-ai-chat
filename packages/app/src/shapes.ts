@@ -1,8 +1,7 @@
 import { Row } from '@electric-sql/client';
 import { useShape, preloadShape } from '@electric-sql/react';
 import { useEffect, useMemo, useRef } from 'react';
-
-const ELECTRIC_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from './api.js';
 
 type ShapeOptions<T extends Row<unknown> = Row> = Parameters<typeof useShape<T>>[0];
 
@@ -79,7 +78,7 @@ export interface Chat extends MessageRow {
 
 export function chatsShapeConfig(): ShapeOptions<Chat> {
   return {
-    url: `${ELECTRIC_API_URL}/shape`,
+    url: `${API_URL}/shape`,
     params: {
       table: 'chats',
     },
@@ -119,7 +118,7 @@ export interface Message extends MessageRow {
 
 export function messagesShapeConfig(chatId: string): ShapeOptions<Message> {
   return {
-    url: `${ELECTRIC_API_URL}/shape`,
+    url: `${API_URL}/shape`,
     params: {
       table: 'messages',
       where: `chat_id = '${chatId}'`,
@@ -149,7 +148,7 @@ export interface Token extends MessageRow {
 
 export function tokensShapeConfig(messageId: string): ShapeOptions<Token> {
   return {
-    url: `${ELECTRIC_API_URL}/shape`,
+    url: `${API_URL}/shape`,
     params: {
       table: 'tokens',
       where: `message_id = '${messageId}'`,
@@ -176,7 +175,7 @@ export interface File extends MessageRow {
 
 export function filesShapeConfig(chatId: string): ShapeOptions<File> {
   return {
-    url: `${ELECTRIC_API_URL}/shape`,
+    url: `${API_URL}/shape`,
     params: {
       table: 'files',
       where: `chat_id = '${chatId}'`,
@@ -207,7 +206,7 @@ export interface TodoList extends MessageRow {
 
 export function todoListsShapeConfig(): ShapeOptions<TodoList> {
   return {
-    url: `${ELECTRIC_API_URL}/shape`,
+    url: `${API_URL}/shape`,
     params: {
       table: 'todo_lists',
     },
@@ -245,7 +244,7 @@ export interface TodoItem extends MessageRow {
 
 export function todoItemsShapeConfig(listId: string): ShapeOptions<TodoItem> {
   return {
-    url: `${ELECTRIC_API_URL}/shape`,
+    url: `${API_URL}/shape`,
     params: {
       table: 'todo_items',
       where: `list_id = '${listId}'`,
@@ -278,7 +277,7 @@ export interface UserPresence extends MessageRow {
 
 export function presenceShapeConfig(chatId: string): ShapeOptions<UserPresence> {
   return {
-    url: `${ELECTRIC_API_URL}/shape`,
+    url: `${API_URL}/shape`,
     params: {
       table: 'user_presence',
       where: `chat_id = '${chatId}'`,

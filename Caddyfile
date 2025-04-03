@@ -1,0 +1,23 @@
+# This enables the automatic https/http2 on localhost for dev
+localhost:3002 {
+	handle_path /api/* {
+		uri strip_prefix /api
+		reverse_proxy localhost:3001
+	}
+	reverse_proxy localhost:5173
+	encode {
+		gzip
+	}
+}
+
+# This is http1 only but public for testing from other devices
+:3003 {
+	handle_path /api/* {
+		uri strip_prefix /api
+		reverse_proxy localhost:3001
+	}
+	reverse_proxy localhost:5173
+	encode {
+		gzip
+	}
+}
