@@ -20,13 +20,6 @@ interface SchemaInfo {
   }[];
 }
 
-interface SchemaToolParams {
-  redactedUrl: string;
-  redactedId: string;
-  password: string; // Password is sent with each request
-}
-
-// Helper function to create a PostgreSQL connection with read-only permissions
 function createReadOnlyConnection(redactedUrl: string, password: string) {
   // Create a URL object to properly handle the replacement
   const urlObj = new URL(redactedUrl);
@@ -44,7 +37,6 @@ function createReadOnlyConnection(redactedUrl: string, password: string) {
   const actualUrl = urlObj.toString();
   console.log('Actual URL (with password hidden):', actualUrl.replace(password, '[HIDDEN]'));
 
-  // Create a read-only connection
   return postgres(actualUrl, {
     max: 1,
     idle_timeout: 20,

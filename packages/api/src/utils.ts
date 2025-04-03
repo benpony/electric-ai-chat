@@ -1,5 +1,6 @@
-import { ChatMessage } from './types.js';
 import { randomUUID } from 'crypto';
+import type { ChatCompletionSystemMessageParam } from 'openai/resources/chat/completions';
+import { ChatMessage } from './types.js';
 import { db } from './db.js';
 
 export const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -297,4 +298,45 @@ export function levenshteinDistance(a: string, b: string): number {
   }
 
   return matrix[b.length][a.length];
+}
+
+// Add this function to store system messages for historical context
+export async function storeSystemMessage(chatId: string, content: string) {
+  try {
+    const messageId = randomUUID();
+
+    await db`
+      INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
+      VALUES (${messageId}, ${chatId}, ${content}, 'System', 'system', 'completed', NOW(), NOW())
+    `;
+
+    console.log(`Stored system message for context: ${content.substring(0, 50)}...`);
+    return messageId;
+  } catch (error) {
+    console.error('Error storing system message:', error);
+    // Non-critical error, so we just log it and continue
+    return null;
+  }
+}
+
+// Add a function to retrieve system messages from the database
+export async function fetchSystemMessages(
+  chatId: string
+): Promise<ChatCompletionSystemMessageParam[]> {
+  try {
+    const systemMessages = await db`
+      SELECT content, created_at
+      FROM messages
+      WHERE chat_id = ${chatId} AND role = 'system'
+      ORDER BY created_at ASC
+    `;
+
+    return systemMessages.map(msg => ({
+      role: 'system' as const,
+      content: msg.content,
+    }));
+  } catch (error) {
+    console.error('Error fetching system messages:', error);
+    return []; // Return empty array on error
+  }
 }

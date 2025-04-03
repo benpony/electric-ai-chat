@@ -8,7 +8,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPEN_AI_KEY,
 });
 
-// Helper function to create a concise chat name using OpenAI
 export async function generateChatName(message: string) {
   try {
     const completion = await openai.chat.completions.create({
@@ -36,7 +35,6 @@ export async function generateChatName(message: string) {
   }
 }
 
-// Chat name generator tool
 export async function renameChat(chatId: string, context: string): Promise<string> {
   try {
     const newName = await generateChatName(context);

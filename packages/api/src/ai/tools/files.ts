@@ -3,7 +3,6 @@ import { db } from '../../db.js';
 import { randomUUID } from 'crypto';
 import { ToolHandler } from '../../types.js';
 
-// File management tools
 export const fileTools: ChatCompletionTool[] = [
   {
     type: 'function' as const,
