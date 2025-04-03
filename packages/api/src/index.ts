@@ -176,7 +176,11 @@ app.post('/api/chats', async (c: Context) => {
     `;
 
     // Make sure dbUrl has the password field required by createAIResponse
-    const aiMessage = await createAIResponse(chatId, messages, dbUrl);
+    const aiMessage = await createAIResponse({
+      chatId,
+      contextRows: messages,
+      dbUrl,
+    });
 
     // Include the pending AI message in the response
     chat.messages.push(aiMessage);
@@ -291,7 +295,11 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
     messages.push(result.newMessage!);
 
     // Create AI response (will create a pending message and process in background)
-    const aiMessage = await createAIResponse(chatId, messages, dbUrl);
+    const aiMessage = await createAIResponse({
+      chatId,
+      contextRows: messages,
+      dbUrl,
+    });
 
     // Return both the user message and the pending AI message
     return c.json(

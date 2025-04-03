@@ -50,12 +50,36 @@ allToolHandlers.forEach(handler => {
   toolHandlerMap.set(handler.name, handler);
 });
 
+// Interface definitions for function parameters
+export interface CreateAIResponseParams {
+  chatId: string;
+  contextRows: any[];
+  dbUrl?: { redactedUrl: string; redactedId: string; password: string };
+}
+
+export interface ProcessToolCallParams {
+  toolCall: ToolCall;
+  chatId: string;
+  messageId: string;
+  abortController: AbortController;
+  dbUrlParam?: { redactedUrl: string; redactedId: string; password: string };
+}
+
+export interface ProcessAIStreamParams {
+  chatId: string;
+  messageId: string;
+  context: ChatMessage[];
+  dbUrlParam?: { redactedUrl: string; redactedId: string; password: string };
+  recursionDepth?: number;
+  baseMessages?: ChatCompletionMessageParam[];
+  accumulatedContent?: string;
+  currentTokenNumber?: number;
+  currentTokenBuffer?: string;
+  currentLastInsertTime?: number;
+}
+
 // Helper function to create AI response
-export async function createAIResponse(
-  chatId: string,
-  contextRows: any[],
-  dbUrl?: { redactedUrl: string; redactedId: string; password: string }
-) {
+export async function createAIResponse({ chatId, contextRows, dbUrl }: CreateAIResponseParams) {
   try {
     // Convert rows to ChatMessage objects and limit context size
     const context = contextRows.map(rowToChatMessage);
@@ -71,7 +95,12 @@ export async function createAIResponse(
     `;
 
     // Start streaming in background
-    processAIStream(chatId, messageId, limitedContext, dbUrl).catch(error => {
+    processAIStream({
+      chatId,
+      messageId,
+      context: limitedContext,
+      dbUrlParam: dbUrl,
+    }).catch(error => {
       console.error('Error in AI streaming:', error);
       // Update message to failed status if there's an error
       db`
@@ -120,13 +149,13 @@ function limitContextSize(messages: ChatMessage[]): ChatMessage[] {
 }
 
 // Process each tool call and return the result
-async function processToolCall(
-  toolCall: ToolCall,
-  chatId: string,
-  messageId: string,
-  abortController: AbortController,
-  dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
-): Promise<{
+async function processToolCall({
+  toolCall,
+  chatId,
+  messageId,
+  abortController,
+  dbUrlParam,
+}: ProcessToolCallParams): Promise<{
   content: string;
   systemMessage?: string;
   requiresReentry?: boolean;
@@ -324,18 +353,18 @@ async function fetchSystemMessages(chatId: string): Promise<ChatCompletionSystem
 }
 
 // Process AI stream in background
-async function processAIStream(
-  chatId: string,
-  messageId: string,
-  context: ChatMessage[],
-  dbUrlParam?: { redactedUrl: string; redactedId: string; password: string },
-  recursionDepth: number = 0,
-  baseMessages: ChatCompletionMessageParam[] = [],
-  accumulatedContent: string = '',
-  currentTokenNumber: number = 0,
-  currentTokenBuffer: string = '',
-  currentLastInsertTime: number = Date.now()
-) {
+async function processAIStream({
+  chatId,
+  messageId,
+  context,
+  dbUrlParam,
+  recursionDepth = 0,
+  baseMessages = [],
+  accumulatedContent = '',
+  currentTokenNumber = 0,
+  currentTokenBuffer = '',
+  currentLastInsertTime = Date.now(),
+}: ProcessAIStreamParams) {
   // Limit recursion depth to prevent infinite loops
   const MAX_RECURSION_DEPTH = 10;
   if (recursionDepth > MAX_RECURSION_DEPTH) {
@@ -609,13 +638,13 @@ Please avoid repeating these operations unless specifically requested by the use
     // Process each tool call, completing the current message and creating a new one after each call
     for (const toolCall of toolCalls) {
       // Process the tool call
-      const result = await processToolCall(
+      const result = await processToolCall({
         toolCall,
         chatId,
-        currentMessageId,
+        messageId: currentMessageId,
         abortController,
-        dbUrlParam
-      );
+        dbUrlParam,
+      });
 
       // Complete the current message if it has content
       if (fullContent.trim().length > 0) {
@@ -703,18 +732,18 @@ Please avoid repeating these operations unless specifically requested by the use
         `Making recursive call at depth ${recursionDepth + 1} with ${systemMessages.length} new system messages`
       );
 
-      return processAIStream(
+      return processAIStream({
         chatId,
-        currentMessageId,
+        messageId: currentMessageId,
         context,
         dbUrlParam,
-        recursionDepth + 1,
-        nextMessages,
-        fullContent,
-        tokenNumber,
-        tokenBuffer,
-        lastInsertTime
-      );
+        recursionDepth: recursionDepth + 1,
+        baseMessages: nextMessages,
+        accumulatedContent: fullContent,
+        currentTokenNumber: tokenNumber,
+        currentTokenBuffer: tokenBuffer,
+        currentLastInsertTime: lastInsertTime,
+      });
     } else {
       // No more tool calls, finalize the message
       if (fullContent.trim().length > 0) {
