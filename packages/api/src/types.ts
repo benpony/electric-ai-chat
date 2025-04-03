@@ -82,3 +82,15 @@ export interface ToolHandler {
    */
   checkIfSimilar?: (currentArgs: unknown, previousArgs: unknown) => boolean;
 }
+
+export interface UserPresence {
+  id: string;
+  chat_id: string;
+  user_name: string;
+  last_seen: Date;
+  created_at: Date;
+}
+
+export interface UpdatePresenceRequest {
+  user_name: string;
+}

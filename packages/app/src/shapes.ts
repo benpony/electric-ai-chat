@@ -264,3 +264,31 @@ export function useTodoItemsShape(listId: string) {
 export async function preloadTodoItems(listId: string) {
   await preloadShape<TodoItem>(todoItemsShapeConfig(listId));
 }
+
+// User Presence Shape
+
+export interface UserPresence extends MessageRow {
+  id: string;
+  chat_id: string;
+  user_name: string;
+  last_seen: Date;
+  created_at: Date;
+}
+
+export function presenceShapeConfig(chatId: string): ShapeOptions<UserPresence> {
+  return {
+    url: `${ELECTRIC_API_URL}/shape`,
+    params: {
+      table: 'user_presence',
+      where: `chat_id = '${chatId}'`,
+    },
+    parser: {
+      timestamptz: (value: string) => new Date(value),
+    },
+    signal: new AbortController().signal, // Dummy signal to ensure hashing is consistent
+  };
+}
+
+export function usePresenceShape(chatId: string) {
+  return useShapeWithAbort(presenceShapeConfig(chatId), 1000);
+}

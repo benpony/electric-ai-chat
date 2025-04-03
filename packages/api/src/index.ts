@@ -6,7 +6,7 @@ import type { Context } from 'hono';
 import { randomUUID } from 'crypto';
 import { db } from './db.js';
 import { rowToChatMessage } from './utils.js';
-import { Chat, CreateChatRequest, CreateMessageRequest } from './types.js';
+import { Chat, CreateChatRequest, CreateMessageRequest, UpdatePresenceRequest } from './types.js';
 import { createAIResponse, generateChatName, ENABLE_AI } from './ai/index.js';
 
 // Access the Electric API URL
@@ -257,7 +257,7 @@ app.post('/api/chats/:id/messages', async (c: Context) => {
 
     // Handle transaction result
     if (result.error) {
-      return c.json({ error: result.error }, result.status);
+      return c.json({ error: result.error }, result.status as any);
     }
 
     // If AI is disabled, return the user message only
@@ -338,7 +338,7 @@ app.post('/api/messages/:id/abort', async (c: Context) => {
 
     // Handle transaction result
     if (result.error) {
-      return c.json({ error: result.error }, result.status);
+      return c.json({ error: result.error }, result.status as any);
     }
 
     return c.json(result);
@@ -618,6 +618,80 @@ app.delete('/api/todo-items/:id', async (c: Context) => {
   } catch (err) {
     console.error('Error deleting todo item:', err);
     return c.json({ error: 'Failed to delete todo item' }, 500);
+  }
+});
+
+// Update user presence in a chat
+app.post('/api/chats/:id/presence', async (c: Context) => {
+  const chatId = c.req.param('id');
+  const body = await c.req.json();
+  const { user_name } = body as UpdatePresenceRequest;
+
+  if (!user_name) {
+    return c.json({ error: 'User name is required' }, 400);
+  }
+
+  try {
+    // Upsert user presence
+    const [presence] = await db`
+      INSERT INTO user_presence (id, chat_id, user_name, last_seen)
+      VALUES (${randomUUID()}, ${chatId}, ${user_name}, NOW())
+      ON CONFLICT (chat_id, user_name)
+      DO UPDATE SET
+        last_seen = NOW()
+      RETURNING id, chat_id, user_name, last_seen, created_at
+    `;
+
+    // Clean up stale presence records (older than 20 seconds)
+    await db`
+      DELETE FROM user_presence
+      WHERE last_seen < NOW() - INTERVAL '20 seconds'
+    `;
+
+    return c.json({ presence });
+  } catch (err) {
+    console.error('Error updating presence:', err);
+    return c.json({ error: 'Failed to update presence' }, 500);
+  }
+});
+
+// Get active users in a chat (for debugging)
+app.get('/api/chats/:id/presence', async (c: Context) => {
+  const chatId = c.req.param('id');
+
+  try {
+    const presences = await db`
+      SELECT id, chat_id, user_name, last_seen, created_at
+      FROM user_presence
+      WHERE chat_id = ${chatId}
+      AND last_seen > NOW() - INTERVAL '20 seconds'
+      ORDER BY user_name
+    `;
+
+    return c.json({ presences });
+  } catch (err) {
+    console.error('Error fetching presence:', err);
+    return c.json({ error: 'Failed to fetch presence' }, 500);
+  }
+});
+
+// Delete a user's presence from a chat
+app.delete('/api/chats/:id/presence/:userName', async (c: Context) => {
+  const chatId = c.req.param('id');
+  const userName = c.req.param('userName');
+
+  try {
+    // Delete the presence record
+    await db`
+      DELETE FROM user_presence
+      WHERE chat_id = ${chatId}
+      AND user_name = ${userName}
+    `;
+
+    return c.json({ success: true });
+  } catch (err) {
+    console.error('Error removing presence:', err);
+    return c.json({ error: 'Failed to remove presence' }, 500);
   }
 });
 

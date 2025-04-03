@@ -70,6 +70,18 @@ export interface UpdateTodoItemRequest {
   order_key?: string;
 }
 
+export interface UpdatePresenceRequest {
+  user_name: string;
+}
+
+export interface UserPresence {
+  id: string;
+  chat_id: string;
+  user_name: string;
+  last_seen: Date;
+  created_at: Date;
+}
+
 // API client
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -246,6 +258,52 @@ export async function deleteTodoItem(itemId: string): Promise<{ success: boolean
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || 'Failed to delete todo item');
+  }
+
+  return response.json();
+}
+
+/**
+ * Update user presence in a chat
+ */
+export async function updatePresence(
+  chatId: string,
+  userName: string
+): Promise<{ presence: UserPresence }> {
+  const payload: UpdatePresenceRequest = { user_name: userName };
+
+  const response = await fetch(`${API_URL}/api/chats/${chatId}/presence`, {
+    method: 'POST',
+    ...commonFetchOptions,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update presence');
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete user presence when leaving a chat
+ */
+export async function deletePresence(
+  chatId: string,
+  userName: string
+): Promise<{ success: boolean }> {
+  const response = await fetch(
+    `${API_URL}/api/chats/${chatId}/presence/${encodeURIComponent(userName)}`,
+    {
+      method: 'DELETE',
+      ...commonFetchOptions,
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete presence');
   }
 
   return response.json();

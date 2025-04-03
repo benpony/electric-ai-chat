@@ -75,3 +75,18 @@ CREATE INDEX IF NOT EXISTS ai_actions_action_type_idx ON ai_actions (action_type
 
 -- Create index for reverse chronological order queries
 CREATE INDEX IF NOT EXISTS ai_actions_created_at_idx ON ai_actions (created_at DESC);
+
+-- User presence tracking table
+CREATE TABLE IF NOT EXISTS user_presence (
+    id UUID PRIMARY KEY,
+    chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
+    user_name TEXT NOT NULL,
+    last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (chat_id, user_name)
+);
+
+-- Index for efficient lookups by chat_id
+CREATE INDEX IF NOT EXISTS user_presence_chat_id_idx ON user_presence (chat_id);
+-- Index for efficient cleanup of stale presence records
+CREATE INDEX IF NOT EXISTS user_presence_last_seen_idx ON user_presence (last_seen);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useMemo } from 'react';
 import { useParams } from '@tanstack/react-router';
 import {
   Box,
@@ -13,12 +13,13 @@ import {
 import { Menu, Send, FileText, Terminal } from 'lucide-react';
 import { useSidebar } from './SidebarProvider';
 import { useChatSidebar } from './ChatSidebarProvider';
-import { useChat, useMessagesShape, useFilesShape } from '../shapes';
-import { addMessage } from '../api';
+import { useChat, useMessagesShape, useFilesShape, usePresenceShape } from '../shapes';
+import { addMessage, updatePresence, deletePresence } from '../api';
 import AiResponse from './AiResponse';
 import { ChatSidebar } from './ChatSidebar';
 import { processDatabaseUrl } from '../utils/db-url';
 import { getChatPasswords } from '../utils/password-store';
+import UserAvatar from './UserAvatar';
 
 type Message = {
   id: string;
@@ -51,11 +52,13 @@ interface MessageInputProps {
 interface UserPromptProps {
   message: Message;
   isCurrentUser: boolean;
+  multipleUsers: boolean;
 }
 
 // UserPrompt component to display user messages
-const UserPrompt = memo(({ message, isCurrentUser }: UserPromptProps) => {
+const UserPrompt = memo(({ message, isCurrentUser, multipleUsers }: UserPromptProps) => {
   const isSystemMessage = message.role === 'system';
+  const showAvatar = !isSystemMessage;
 
   return (
     <Flex
@@ -67,31 +70,44 @@ const UserPrompt = memo(({ message, isCurrentUser }: UserPromptProps) => {
         alignSelf: isSystemMessage ? 'stretch' : 'auto',
       }}
     >
-      {!isCurrentUser && !isSystemMessage && (
-        <Text
-          size="1"
-          style={{
-            color: 'var(--gray-11)',
-            marginLeft: '4px',
-            marginBottom: '3px',
-          }}
-        >
-          {message.user_name}
-        </Text>
-      )}
-      {isSystemMessage && (
-        <Text
-          size="1"
-          style={{
-            color: 'var(--amber-11)',
-            marginLeft: '4px',
-            marginBottom: '3px',
-            fontWeight: 'bold',
-          }}
-        >
-          System
-        </Text>
-      )}
+      <Flex
+        align="center"
+        gap="2"
+        style={{
+          marginBottom: '3px',
+          flexDirection: isCurrentUser ? 'row-reverse' : 'row',
+        }}
+      >
+        {multipleUsers && showAvatar && (
+          <UserAvatar username={message.user_name} size="small" showTooltip={false} />
+        )}
+
+        {multipleUsers && !isSystemMessage && (
+          <Text
+            size="1"
+            style={{
+              color: 'var(--gray-11)',
+              marginLeft: '-2px',
+              marginBottom: '3px',
+            }}
+          >
+            {message.user_name}
+          </Text>
+        )}
+        {isSystemMessage && (
+          <Text
+            size="1"
+            style={{
+              color: 'var(--amber-11)',
+              marginLeft: '4px',
+              marginBottom: '3px',
+              fontWeight: 'bold',
+            }}
+          >
+            System
+          </Text>
+        )}
+      </Flex>
       <Box
         style={{
           backgroundColor: isSystemMessage
@@ -121,6 +137,11 @@ const UserPrompt = memo(({ message, isCurrentUser }: UserPromptProps) => {
 // MessageList component to display messages
 const MessageList = memo(
   ({ messages, username, scrollAreaRef, scrollContentRef, messagesEndRef }: MessageListProps) => {
+    const usernames = new Set(
+      messages.filter(msg => msg.role === 'user').map(msg => msg.user_name)
+    );
+    const multipleUsers = Boolean(usernames.size > 1);
+
     return (
       <ScrollArea style={{ height: '100%' }} scrollbars="vertical" ref={scrollAreaRef}>
         <Box
@@ -163,7 +184,11 @@ const MessageList = memo(
                 {msg.role === 'agent' ? (
                   <AiResponse message={msg} />
                 ) : (
-                  <UserPrompt message={msg} isCurrentUser={msg.user_name === username} />
+                  <UserPrompt
+                    message={msg}
+                    isCurrentUser={msg.user_name === username}
+                    multipleUsers={multipleUsers}
+                  />
                 )}
               </Flex>
             ))}
@@ -281,6 +306,33 @@ export default function ChatScreen() {
     localStorage.getItem('showSystemMessages') === 'true'
   );
 
+  // Presence related state
+  const { data: presences } = usePresenceShape(chatId);
+  const presenceIntervalRef = useRef<number | null>(null);
+
+  // User presence utilities
+  const isActivePresence = (presence: { last_seen: Date | string }, maxAgeSeconds = 20) => {
+    const lastSeen = new Date(presence.last_seen);
+    const now = new Date();
+    const diffSeconds = Math.floor((now.getTime() - lastSeen.getTime()) / 1000);
+    return diffSeconds < maxAgeSeconds;
+  };
+
+  // Get sorted presences (excluding current user if there's only 1 presence)
+  const sortedPresences = useMemo(() => {
+    // Filter out stale presences (older than 20 seconds)
+    const activePresences = presences.filter(p => isActivePresence(p));
+
+    // Filter out current user
+    const otherUsers = activePresences.filter(p => p.user_name !== username);
+
+    // Sort by username
+    return [...otherUsers].sort((a, b) => a.user_name.localeCompare(b.user_name));
+  }, [presences, username]);
+
+  // Determine if we should show current user avatar
+  const showCurrentUserAvatar = presences.filter(p => isActivePresence(p)).length > 1;
+
   // Save showSystemMessages preference to localStorage when it changes
   useEffect(() => {
     localStorage.setItem('showSystemMessages', showSystemMessages.toString());
@@ -298,6 +350,36 @@ export default function ChatScreen() {
       '--shadow-message': '0 1px 1px rgba(0, 0, 0, 0.2)',
     },
   };
+
+  // Set up presence ping interval
+  useEffect(() => {
+    // Function to update presence
+    const pingPresence = async () => {
+      try {
+        await updatePresence(chatId, username);
+      } catch (error) {
+        console.error('Failed to update presence:', error);
+      }
+    };
+
+    // Ping immediately on mount
+    pingPresence();
+
+    // Set up interval to ping every 10 seconds
+    presenceIntervalRef.current = window.setInterval(pingPresence, 10000);
+
+    // Cleanup interval on unmount and remove user presence
+    return () => {
+      if (presenceIntervalRef.current) {
+        window.clearInterval(presenceIntervalRef.current);
+      }
+
+      // Delete presence when leaving the chat
+      deletePresence(chatId, username).catch(error => {
+        console.error('Failed to delete presence:', error);
+      });
+    };
+  }, [chatId, username]);
 
   useEffect(() => {
     // Add event listener for window resize
@@ -456,7 +538,28 @@ export default function ChatScreen() {
             {chat.name}
           </Text>
         </Flex>
-        <Flex align="center" gap="2">
+
+        <Flex align="center" gap="3">
+          {/* User presence avatars */}
+          {presences.filter(p => isActivePresence(p)).length > 0 && (
+            <Flex align="center" style={{ marginRight: '8px', paddingLeft: '5px' }}>
+              {/* Show all other users */}
+              {sortedPresences.map((presence, index) => (
+                <UserAvatar
+                  key={presence.id}
+                  username={presence.user_name}
+                  size="medium"
+                  index={index}
+                />
+              ))}
+
+              {/* Show current user if there are multiple users */}
+              {showCurrentUserAvatar && (
+                <UserAvatar username={username} size="medium" index={sortedPresences.length} />
+              )}
+            </Flex>
+          )}
+
           <Tooltip content="Show System Messages">
             <Flex align="center" gap="1">
               <Terminal size={14} style={{ opacity: showSystemMessages ? 1 : 0.5 }} />
