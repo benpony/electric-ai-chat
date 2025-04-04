@@ -4,7 +4,9 @@
   "description": "Multi-user AI chat application",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"VITE_API_URL=/api pnpm dev:app\" \"pnpm dev:api\" \"caddy run --config Caddyfile\"",
+    "dev": "concurrently \"pnpm dev:app-for-caddy\" \"pnpm dev:api\" \"pnpm dev:caddy\"",
+    "dev:caddy": "caddy run --config Caddyfile",
+    "dev:app-for-caddy": "VITE_API_URL=/api pnpm --filter electric-chat-app dev --host",
     "dev:app": "pnpm --filter electric-chat-app dev --host",
     "dev:api": "pnpm --filter electric-chat-api dev",
     "build:app": "pnpm --filter electric-chat-app build",
