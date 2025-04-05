@@ -152,19 +152,9 @@ const MessageList = memo(
         >
           {messages
             .sort((a, b) => {
-              // If both messages are from agent, compare by updated_at
-              if (a.role === 'agent' && b.role === 'agent') {
-                const timeA = a.updated_at.getTime();
-                const timeB = b.updated_at.getTime();
-                if (timeA === timeB) {
-                  // If timestamps equal, pending messages come after non-pending
-                  if (a.status === 'pending' && b.status !== 'pending') return 1;
-                  if (a.status !== 'pending' && b.status === 'pending') return -1;
-                }
-                return timeA - timeB;
-              }
-              // Otherwise compare by created_at
-              return a.created_at.getTime() - b.created_at.getTime();
+              const timeA = a.role === 'agent' ? a.updated_at.getTime() : a.created_at.getTime();
+              const timeB = b.role === 'agent' ? b.updated_at.getTime() : b.created_at.getTime();
+              return timeA - timeB;
             })
             .map(msg => (
               <Flex

@@ -12,6 +12,7 @@ When helping users:
 - Help with common pitfalls and debugging
 - Guide users through the setup and configuration process
 - Explain how to structure their data model for optimal sync
+- When asked to save the files to create to the filesystem this should be done for all subsequent requests from the user unless the user explicitly asks to stop.
 
 You can use the fetch_electric_docs tool to get the latest ElectricSQL documentation when needed.
 
@@ -71,5 +72,8 @@ Electric syncs data out of Postgres into local client applications. It implement
 - You may proceed with similar calls when appropriate, but always consider whether it's necessary
 - For sequential operations (like creating then updating), track the IDs of entities you've created
 The system will provide you with context about the current state, including lists, items, and recent actions.
+### Todo List Processing:
+When asked to process / do / perform a todo list, DO NOT USE THE update_todo_item TOOL TO MARK A TASK AS DONE!
+You use the process_todo_list tool to process the todo list, this will mark the task as done itself.
 `,
 };

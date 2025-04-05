@@ -1,10 +1,18 @@
 import { ChatCompletionTool } from 'openai/resources/chat/completions';
 import { db } from '../../../db.js';
 import { ToolHandler } from '../../../types.js';
-import { recordAction } from '../../../utils.js';
+import { recordAction, rowToChatMessage } from '../../../utils.js';
 import { Shape, ShapeStream } from '@electric-sql/client';
 import { randomUUID } from 'crypto';
 import { ELECTRIC_API_URL } from '../../../urls.js';
+import { processAIStream } from '../../stream.js';
+
+interface TodoItem {
+  id: string;
+  list_id: string;
+  task: string;
+  done: boolean;
+}
 
 // Define the Todo List tools
 export const todoTools: ChatCompletionTool[] = [
@@ -48,14 +56,160 @@ export const todoTools: ChatCompletionTool[] = [
 
 // ======== Helper functions for the tool handlers ========
 
-// Helper function for processing todo list items
-async function processTodoListItems(
-  listId: string,
-  chatId: string,
-  messageId: string,
-  abortSignal: AbortSignal,
-  watchMode: boolean = false
-): Promise<{ status: string; completedTasks: string[]; abortedTasks: string[] }> {
+interface ProcessTodoListItemParams {
+  listId: string;
+  chatId: string;
+  messageId: string;
+  item: TodoItem;
+  abortSignal: AbortSignal;
+}
+
+async function processTodoListItem({
+  listId,
+  chatId,
+  messageId,
+  item,
+  abortSignal,
+}: ProcessTodoListItemParams): Promise<void> {
+  console.log(`Processing task: ${item.task}`);
+
+  // Insert a "user" message about the task
+  await db`
+    INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
+    VALUES (
+      ${randomUUID()},
+      ${chatId},
+      ${`You are working through a todo list. Please perform the following task:
+
+${item.task}
+
+This is to be interpreted exactly as though it is a message from the user.
+For example if the user is asked to "write a story about a cat", you should respond with the story.
+Or if asked to "create a to do app with Electric" you would respond with the code for the app.
+If asked to "save the files" *then* you would use the save_file tool.
+Please only use tools that are relevant to the task.
+Do let the user know what the task is that you are working on, but do not ask the user to do anything. 
+Also do not ask if there is anything else they would like you to do.
+`},
+      'Task Assistant',
+      'system',
+      'completed',
+      NOW(),
+      NOW()
+    )
+  `;
+
+  // Get the messages
+  const rawMessages = await db`
+    SELECT 
+      m.id, 
+      CASE 
+        WHEN m.status = 'pending' AND tokens_content IS NOT NULL THEN tokens_content
+        ELSE m.content
+      END as content,
+      m.user_name, 
+      m.role, 
+      m.status, 
+      m.created_at, 
+      m.updated_at
+    FROM messages m
+    LEFT JOIN LATERAL (
+      SELECT string_agg(token_text, '') as tokens_content
+      FROM tokens 
+      WHERE message_id = m.id
+      GROUP BY message_id
+    ) t ON m.status = 'pending'
+    WHERE m.chat_id = ${chatId}
+    ORDER BY m.created_at ASC
+  `;
+
+  // Insert a "assistant" message about the task
+  const assistantMessageId = randomUUID();
+  await db`
+    INSERT INTO messages (id, chat_id, user_name, role, status, thinking_text, created_at, updated_at)
+    VALUES (
+      ${assistantMessageId},
+      ${chatId},
+      'Task Assistant',
+      'agent',
+      'pending',
+      ${`Processing task: "${item.task}"...`},
+      NOW(),
+      NOW()
+    )
+  `;
+
+  // Preprocess the messages
+  const messages = rawMessages.sort((a, b) => {
+    // If both messages are from agent, compare by updated_at
+    // if (a.role === 'agent' && b.role === 'agent') {
+    //   const timeA = a.updated_at.getTime();
+    //   const timeB = b.updated_at.getTime();
+    //   if (timeA === timeB) {
+    //     // If timestamps equal, pending messages come after non-pending
+    //     if (a.status === 'pending' && b.status !== 'pending') return 1;
+    //     if (a.status !== 'pending' && b.status === 'pending') return -1;
+    //   }
+    //   return timeA - timeB;
+    // }
+    // Otherwise compare by created_at
+    return a.updated_at.getTime() - b.updated_at.getTime();
+  });
+  const context = messages.map(rowToChatMessage);
+
+  // Remove the last message if it is a assistant a with no content
+  if (
+    messages[messages.length - 1].role === 'agent' &&
+    messages[messages.length - 1].content === ''
+  ) {
+    context.pop();
+  }
+
+  // Insert a system message about the task in the n-1 position
+  // context.splice(context.length - 1, 0, {
+  //   role: 'system',
+  //   content: `You need to perform the task in the next message. This is to be interpreted as though it is a message from the user.\n\nDO NOT USE THE update_todo_item OR delete_todo_item TOOLS TO MARK A TASK AS DONE - THIS IS VERY IMPORTANT!`,
+  // });
+
+  // Process the task
+  console.log('>>> processing task');
+  await processAIStream({
+    chatId,
+    messageId: assistantMessageId,
+    context,
+    recursionDepth: 0,
+    excludeTools: [/todo/, /chat/],
+  });
+  console.log('>>> done processing task');
+  // Update the assistant message to say we're done
+  // await db`
+  //   UPDATE messages
+  //   SET content = ${`this would be the output of the task`},
+  //       status = 'completed',
+  //       updated_at = NOW()
+  //   WHERE id = ${assistantMessageId}
+  // `;
+}
+
+interface ProcessTodoListItemsParams {
+  listId: string;
+  chatId: string;
+  messageId: string;
+  abortSignal: AbortSignal;
+  watchMode?: boolean;
+}
+
+async function processTodoListItems({
+  listId,
+  chatId,
+  messageId,
+  abortSignal,
+  watchMode = false,
+}: ProcessTodoListItemsParams): Promise<{
+  status: string;
+  completedTasks: string[];
+  abortedTasks: string[];
+}> {
   return new Promise((resolve, reject) => {
     // This will be our return data
     const result = {
@@ -102,118 +256,123 @@ async function processTodoListItems(
     const processedTaskIds = new Set<string>();
     const inProgressTaskIds = new Set<string>();
 
-    // Record when we start to know we've processed everything once
-    let initialProcessingComplete = false;
+    // We only want processItems once at a time.
+    let processingItems = false;
 
-    // Subscribe to changes in the todo items
-    listItemsShape.subscribe(
-      async ({
-        rows,
-      }: {
-        rows: Array<{
-          id: string;
-          list_id: string;
-          task: string;
-          done: boolean;
-        }>;
-      }) => {
-        try {
-          // Process new and updated items
-          for (const item of rows) {
-            // Skip if already processed
-            if (processedTaskIds.has(item.id)) continue;
+    function nextItem() {
+      return listItemsShape.currentRows.filter(
+        item => !processedTaskIds.has(item.id) && !inProgressTaskIds.has(item.id) && !item.done
+      )[0];
+    }
 
-            // If the item is already done, mark as processed and skip
-            if (item.done) {
-              processedTaskIds.add(item.id);
-              continue;
+    async function processItems() {
+      if (processingItems) return;
+      processingItems = true;
+
+      try {
+        // Process new and updated items
+        while (true) {
+          const item = nextItem();
+          if (!item) {
+            // If not in watch mode, we're done after initial processing
+            if (!watchMode) {
+              return finish('completed');
+            } else {
+              // If in watch mode, we need to wait for the next item
+              // Update thinking text to say we're watching
+              await db`
+                UPDATE messages
+                SET thinking_text = 'Watching for changes...', updated_at = NOW()
+                WHERE id = ${messageId}
+              `;
+              break;
             }
+          }
 
-            // If we're already working on this task, skip
-            if (inProgressTaskIds.has(item.id)) continue;
+          // Skip if already processed
+          if (processedTaskIds.has(item.id)) continue;
 
-            // Mark as in progress
-            inProgressTaskIds.add(item.id);
+          // If the item is already done, mark as processed and skip
+          if (item.done) {
+            processedTaskIds.add(item.id);
+            continue;
+          }
 
-            // Process the task
-            console.log(`Processing task: ${item.task}`);
+          // If we're already working on this task, skip
+          if (inProgressTaskIds.has(item.id)) continue;
 
-            // Update thinking text for specific task
-            await db`
+          // Mark as in progress
+          inProgressTaskIds.add(item.id);
+
+          // Process the task
+          console.log(`Processing task: ${item.task}`);
+
+          // Update thinking text for specific task
+          await db`
               UPDATE messages
               SET thinking_text = ${`Processing task: "${item.task}"...`},
                   updated_at = NOW()
               WHERE id = ${messageId}
             `;
 
-            // Check if the item has been marked as done (by checking again)
-            const [updatedItem] = await db`
+          // Check if the item has been marked as done (by checking again)
+          const [updatedItem] = await db`
               SELECT id, done FROM todo_items WHERE id = ${item.id}
             `;
 
-            if (updatedItem && updatedItem.done) {
-              // Task completed by someone else
-              inProgressTaskIds.delete(item.id);
-              processedTaskIds.add(item.id);
-              result.abortedTasks.push(item.task);
-              continue;
-            }
+          if (updatedItem && updatedItem.done) {
+            // Task completed by someone else
+            inProgressTaskIds.delete(item.id);
+            processedTaskIds.add(item.id);
+            result.abortedTasks.push(item.task);
+            continue;
+          }
 
-            try {
-              // Wait a bit to simulate processing time
-              // DOING SOME BIG WORK THINGS HERE.....
-              await new Promise(resolve => setTimeout(resolve, 1000));
+          try {
+            // Process the task
+            await processTodoListItem({
+              listId,
+              chatId,
+              messageId,
+              item,
+              abortSignal,
+            });
 
-              // Mark task as done
-              await db`
+            // Mark task as done
+            await db`
                 UPDATE todo_items
                 SET done = true, updated_at = NOW()
                 WHERE id = ${item.id}
               `;
 
-              // Record the action
-              const listName =
-                (
-                  await db`
+            // Record the action
+            const listName =
+              (
+                await db`
                     SELECT name FROM todo_lists WHERE id = ${listId}
                   `
-                )[0]?.name || 'unknown';
+              )[0]?.name || 'unknown';
 
-              const relationships = [{ type: 'belongs_to_list', id: listId, name: listName }];
+            const relationships = [{ type: 'belongs_to_list', id: listId, name: listName }];
 
-              await recordAction(chatId, 'complete_item', item.id, item.task, relationships);
+            await recordAction(chatId, 'complete_item', item.id, item.task, relationships);
 
-              // Add to completed tasks
-              result.completedTasks.push(item.task);
+            // Add to completed tasks
+            result.completedTasks.push(item.task);
+            
+          } catch (taskError) {
+            console.error(`Error processing task "${item.task}":`, taskError);
 
-              // Send a message about the completed task
-              const taskMessage = randomUUID();
-              await db`
-                INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
-                VALUES (
-                  ${taskMessage},
-                  ${chatId},
-                  ${`✓ Completed task: "${item.task}" in list "${listName}"`},
-                  'AI Assistant',
-                  'agent',
-                  'completed',
-                  NOW(),
-                  NOW()
-                )
-              `;
-            } catch (taskError) {
-              console.error(`Error processing task "${item.task}":`, taskError);
-
-              // Update the task with an error note
-              await db`
+            // Update the task with an error note
+            await db`
                 UPDATE todo_items
                 SET task = ${`${item.task} [ERROR: ${taskError instanceof Error ? taskError.message : 'Processing failed'}]`}
                 WHERE id = ${item.id}
               `;
 
-              // Send a message about the failed task
-              const errorMessage = randomUUID();
-              await db`
+            // Send a message about the failed task
+            const errorMessage = randomUUID();
+            await db`
                 INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
                 VALUES (
                   ${errorMessage},
@@ -226,44 +385,31 @@ async function processTodoListItems(
                   NOW()
                 )
               `;
-            } finally {
-              // Remove from in progress
-              inProgressTaskIds.delete(item.id);
+          } finally {
+            // Remove from in progress
+            inProgressTaskIds.delete(item.id);
 
-              // Mark as processed regardless of success/failure
-              processedTaskIds.add(item.id);
+            // Mark as processed regardless of success/failure
+            processedTaskIds.add(item.id);
 
-              // Update thinking text to be empty
-              await db`
+            // Update thinking text to be empty
+            await db`
                 UPDATE messages
                 SET thinking_text = '', updated_at = NOW()
                 WHERE id = ${messageId}
               `;
-            }
           }
-
-          // Check if we've completed initial processing
-          if (!initialProcessingComplete && rows.length > 0 && inProgressTaskIds.size === 0) {
-            initialProcessingComplete = true;
-
-            // If not in watch mode, we're done after initial processing
-            if (!watchMode) {
-              return finish('completed');
-            }
-          }
-
-          // Update thinking text to say we're watching
-          await db`
-            UPDATE messages
-            SET thinking_text = 'Watching for changes...', updated_at = NOW()
-            WHERE id = ${messageId}
-          `;
-        } catch (err) {
-          streamAbortController.abort();
-          reject(err);
         }
+      } catch (err) {
+        streamAbortController.abort();
+        reject(err);
       }
-    );
+    }
+
+    // Subscribe to changes in the todo items
+    listItemsShape.subscribe(async () => {
+      processItems();
+    });
   });
 }
 
@@ -275,6 +421,14 @@ export const todoToolHandlers: ToolHandler[] = [
     getThinkingText: args => `Processing todo list ${(args as { list_id: string }).list_id}...`,
     process: async (args, chatId, messageId, abortController) => {
       const { list_id } = args as { list_id: string };
+
+      if (!list_id) {
+        return {
+          content: '',
+          systemMessage: 'Error: No list ID provided - please provide a list ID',
+          requiresReentry: true,
+        };
+      }
 
       try {
         // Verify the list exists
@@ -294,13 +448,13 @@ export const todoToolHandlers: ToolHandler[] = [
         const abortController = new AbortController();
 
         // Start processing in the background
-        const processingPromise = processTodoListItems(
-          list_id,
+        const processingPromise = processTodoListItems({
+          listId: list_id,
           chatId,
           messageId,
-          abortController.signal,
-          false // Not in watch mode
-        );
+          abortSignal: abortController.signal,
+          watchMode: false,
+        });
 
         // Set a timeout to abort after a reasonable time
         const timeoutId = setTimeout(
@@ -385,13 +539,13 @@ export const todoToolHandlers: ToolHandler[] = [
         }
 
         // Start processing in the background
-        const processingPromise = processTodoListItems(
-          list_id,
+        const processingPromise = processTodoListItems({
+          listId: list_id,
           chatId,
           messageId,
-          abortController.signal,
-          true // Watch mode
-        );
+          abortSignal: abortController.signal,
+          watchMode: true,
+        });
 
         // Wait for the processing to complete
         const result = await processingPromise;

@@ -30,6 +30,7 @@ export interface ProcessAIStreamParams {
   currentTokenNumber?: number;
   currentTokenBuffer?: string;
   currentLastInsertTime?: number;
+  excludeTools?: (string | RegExp)[];
 }
 
 // Process AI stream in background
@@ -44,6 +45,7 @@ export async function processAIStream({
   currentTokenNumber = 0,
   currentTokenBuffer = '',
   currentLastInsertTime = Date.now(),
+  excludeTools = [],
 }: ProcessAIStreamParams) {
   // Limit recursion depth to prevent infinite loops
   const MAX_RECURSION_DEPTH = 10;
@@ -247,7 +249,22 @@ Please avoid repeating these operations unless specifically requested by the use
   let currentMessageId = messageId;
 
   // Combine all tools
-  const tools = [...basicTools, ...electricTools, ...fileTools, ...postgresTools, ...todoTools];
+  const tools = [
+    ...basicTools,
+    ...electricTools,
+    ...fileTools,
+    ...postgresTools,
+    ...todoTools,
+  ].filter(tool => {
+    for (const excludeTool of excludeTools) {
+      if (typeof excludeTool === 'string' && tool.function.name === excludeTool) {
+        return false;
+      } else if (excludeTool instanceof RegExp && excludeTool.test(tool.function.name)) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   try {
     // Call OpenAI with streaming
@@ -423,6 +440,7 @@ Please avoid repeating these operations unless specifically requested by the use
         currentTokenNumber: tokenNumber,
         currentTokenBuffer: tokenBuffer,
         currentLastInsertTime: lastInsertTime,
+        excludeTools,
       });
     } else {
       // No more tool calls, finalize the message

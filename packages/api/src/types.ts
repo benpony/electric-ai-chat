@@ -1,4 +1,4 @@
-export interface ChatMessage {
+export type ChatMessage = {
   id: string;
   chat_id: string;
   content: string;
@@ -11,7 +11,10 @@ export interface ChatMessage {
     redactedId: string;
     password: string;
   };
-}
+} | {
+  role: 'system';
+  content: string;
+};
 
 export interface ToolCall {
   id: string;

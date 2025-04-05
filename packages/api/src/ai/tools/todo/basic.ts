@@ -105,7 +105,8 @@ export const todoTools: ChatCompletionTool[] = [
           },
           task: {
             type: 'string',
-            description: 'The task text for the new todo item',
+            description:
+              'The task text for the new todo item. This can (and often should) be a long, multi-line description of the task.',
           },
         },
         required: ['list_id', 'task'],
