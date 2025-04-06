@@ -154,6 +154,10 @@ export function tokensShapeConfig(messageId: string): ShapeOptions<Token> {
       where: `message_id = '${messageId}'`,
     },
     signal: new AbortController().signal, // Dummy signal to ensure hashing is consistent
+    // This is the experimental live SSE feature in in this branch of the Electric
+    // client: https://github.com/electric-sql/electric/pull/2544
+    // @ts-ignore - experimentalLiveSse doesn't exist in the types for the non experimental version of the client
+    experimentalLiveSse: true,
   };
 }
 
