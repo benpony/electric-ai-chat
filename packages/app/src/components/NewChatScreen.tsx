@@ -155,6 +155,9 @@ export default function NewChatScreen() {
                 variant="solid"
                 radius="full"
                 disabled={!prompt.trim() || isLoading}
+                style={{
+                  color: '#fff',
+                }}
               >
                 <Send size={16} />
               </IconButton>

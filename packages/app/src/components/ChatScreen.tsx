@@ -496,8 +496,8 @@ export default function ChatScreen() {
     };
   }, [chatId, username]);
 
+  // Add event listener for window resize
   useEffect(() => {
-    // Add event listener for window resize
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
@@ -509,19 +509,35 @@ export default function ChatScreen() {
   // Check if user is scrolled to bottom
   useEffect(() => {
     const handleScroll = () => {
-      if (!scrollAreaRef.current) return;
-
-      const { scrollTop, scrollHeight, clientHeight } = scrollAreaRef.current;
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 20; // 20px threshold
-      setShouldScrollToBottom(isAtBottom);
+      if (isMobile) {
+        // For mobile, check the content area scroll position
+        const contentArea = document.querySelector('.content-area');
+        if (contentArea) {
+          const { scrollTop, scrollHeight, clientHeight } = contentArea;
+          const isAtBottom = scrollHeight - scrollTop - clientHeight < 20; // 20px threshold
+          setShouldScrollToBottom(isAtBottom);
+        }
+      } else if (scrollAreaRef.current) {
+        // For desktop, check the ScrollArea scroll position
+        const { scrollTop, scrollHeight, clientHeight } = scrollAreaRef.current;
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 20; // 20px threshold
+        setShouldScrollToBottom(isAtBottom);
+      }
     };
 
-    const scrollAreaElement = scrollAreaRef.current;
-    if (scrollAreaElement) {
-      scrollAreaElement.addEventListener('scroll', handleScroll);
-      return () => scrollAreaElement.removeEventListener('scroll', handleScroll);
+    if (isMobile) {
+      // For mobile, add scroll listener to content area
+      const contentArea = document.querySelector('.content-area');
+      if (contentArea) {
+        contentArea.addEventListener('scroll', handleScroll);
+        return () => contentArea.removeEventListener('scroll', handleScroll);
+      }
+    } else if (scrollAreaRef.current) {
+      // For desktop, add scroll listener to ScrollArea
+      scrollAreaRef.current.addEventListener('scroll', handleScroll);
+      return () => scrollAreaRef.current?.removeEventListener('scroll', handleScroll);
     }
-  }, []);
+  }, [isMobile]);
 
   // Set up mutation observer to detect content changes
   useEffect(() => {
@@ -529,8 +545,17 @@ export default function ChatScreen() {
 
     // Function to scroll to bottom if needed
     const scrollToBottomIfNeeded = () => {
-      if (shouldScrollToBottom && messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      if (shouldScrollToBottom) {
+        if (isMobile) {
+          // For mobile, scroll the content area
+          const contentArea = document.querySelector('.content-area');
+          if (contentArea) {
+            contentArea.scrollTop = contentArea.scrollHeight;
+          }
+        } else if (messagesEndRef.current) {
+          // For desktop, scroll the ScrollArea
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
       }
     };
 
@@ -559,14 +584,23 @@ export default function ChatScreen() {
 
     // Cleanup
     return () => observer.disconnect();
-  }, [shouldScrollToBottom]);
+  }, [shouldScrollToBottom, isMobile]);
 
+  // Scroll to bottom when messages change or component mounts
   useEffect(() => {
-    // Scroll to bottom only when messages change and shouldScrollToBottom is true
-    if (shouldScrollToBottom && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (shouldScrollToBottom) {
+      if (isMobile) {
+        // For mobile, scroll the content area
+        const contentArea = document.querySelector('.content-area');
+        if (contentArea) {
+          contentArea.scrollTop = contentArea.scrollHeight;
+        }
+      } else if (messagesEndRef.current) {
+        // For desktop, scroll the ScrollArea
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
     }
-  }, [messages, shouldScrollToBottom]);
+  }, [messages, shouldScrollToBottom, isMobile]);
 
   // Function to handle typing status change
   const handleTypingChange = useCallback(
@@ -622,6 +656,25 @@ export default function ChatScreen() {
 
       // Force scroll to bottom when user sends a message
       setShouldScrollToBottom(true);
+
+      // For mobile, immediately scroll to bottom after sending a message
+      if (isMobile) {
+        // Use a more direct approach for mobile
+        setTimeout(() => {
+          // Find the content area element
+          const contentArea = document.querySelector('.content-area');
+          if (contentArea) {
+            // Scroll to the bottom
+            contentArea.scrollTop = contentArea.scrollHeight;
+          } else {
+            // Fallback to window scroll if content area not found
+            window.scrollTo({
+              top: document.documentElement.scrollHeight,
+              behavior: 'smooth',
+            });
+          }
+        }, 100); // Small delay to ensure content is rendered
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
       // Could add error handling/display here
@@ -641,7 +694,25 @@ export default function ChatScreen() {
   }
 
   return (
-    <Flex direction="column" style={{ height: '100%', width: '100%', ...themeVariables }}>
+    <Flex
+      direction="column"
+      style={{
+        height: '100%',
+        width: '100%',
+        ...themeVariables,
+        // On mobile, use a different layout approach
+        ...(isMobile
+          ? {
+              height: '100%',
+              position: 'relative',
+              overflow: 'hidden',
+              // Use dynamic viewport height for mobile
+              minHeight: '100dvh',
+              maxHeight: '100dvh', // Prevent overscrolling
+            }
+          : {}),
+      }}
+    >
       {/* Header with title and sidebar toggle */}
       <Flex
         align="center"
@@ -651,6 +722,15 @@ export default function ChatScreen() {
           borderBottom: '1px solid var(--gray-5)',
           padding: '0 16px',
           flexShrink: 0,
+          // Make header sticky on mobile
+          ...(isMobile
+            ? {
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                backgroundColor: 'var(--background)',
+              }
+            : {}),
         }}
       >
         <Flex align="center" gap="2">
@@ -715,17 +795,109 @@ export default function ChatScreen() {
       </Flex>
 
       {/* Main content area */}
-      <Flex style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <Flex
+        className="content-area"
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          position: 'relative',
+          // On mobile, allow the content to scroll naturally
+          ...(isMobile
+            ? {
+                overflow: 'auto',
+                WebkitOverflowScrolling: 'touch', // For smooth scrolling on iOS
+                height: 'calc(100vh - 112px)', // Account for header and input height
+                maxHeight: 'calc(100vh - 112px)',
+              }
+            : {}),
+        }}
+      >
         {/* Messages - Scrollable */}
-        <Box style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
-          <MessageList
-            messages={messages}
-            username={username}
-            scrollAreaRef={scrollAreaRef}
-            scrollContentRef={scrollContentRef}
-            messagesEndRef={messagesEndRef}
-            typingUsers={typingUsers}
-          />
+        <Box
+          style={{
+            flex: 1,
+            overflow: 'hidden',
+            minWidth: 0,
+            // On mobile, use a different approach for the message list
+            ...(isMobile
+              ? {
+                  overflow: 'visible',
+                  height: 'auto',
+                }
+              : {}),
+          }}
+        >
+          {isMobile ? (
+            // Mobile version - no ScrollArea, just a regular div
+            <Box
+              p="3"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                maxWidth: '100%',
+                paddingBottom: '16px', // Reduced padding at the bottom
+                width: '100%', // Ensure it takes full width
+              }}
+              ref={scrollContentRef}
+            >
+              {messages
+                .sort((a, b) => {
+                  const timeA =
+                    a.role === 'agent' ? a.updated_at.getTime() : a.created_at.getTime();
+                  const timeB =
+                    b.role === 'agent' ? b.updated_at.getTime() : b.created_at.getTime();
+                  return timeA - timeB;
+                })
+                .map(msg => (
+                  <Flex
+                    key={msg.id}
+                    justify={
+                      msg.role === 'system'
+                        ? 'start'
+                        : msg.role === 'agent'
+                          ? 'center'
+                          : msg.user_name === username
+                            ? 'end'
+                            : 'start'
+                    }
+                    style={{
+                      width: '100%',
+                    }}
+                  >
+                    {msg.role === 'agent' ? (
+                      <AiResponse message={msg} />
+                    ) : (
+                      <UserPrompt
+                        message={msg}
+                        isCurrentUser={msg.user_name === username}
+                        multipleUsers={Boolean(
+                          new Set(messages.filter(m => m.role === 'user').map(m => m.user_name))
+                            .size > 1
+                        )}
+                      />
+                    )}
+                  </Flex>
+                ))}
+
+              {/* Show typing indicators after the messages */}
+              {typingUsers.map(user => (
+                <TypingIndicator key={`typing-${user}`} username={user} />
+              ))}
+
+              <div ref={messagesEndRef} style={{ height: '1px' }} />
+            </Box>
+          ) : (
+            // Desktop version - use the existing MessageList component
+            <MessageList
+              messages={messages}
+              username={username}
+              scrollAreaRef={scrollAreaRef}
+              scrollContentRef={scrollContentRef}
+              messagesEndRef={messagesEndRef}
+              typingUsers={typingUsers}
+            />
+          )}
         </Box>
 
         {/* Chat Sidebar */}
@@ -733,11 +905,28 @@ export default function ChatScreen() {
       </Flex>
 
       {/* Message Input - Fixed */}
-      <MessageInput
-        onSubmit={handleMessageSubmit}
-        isLoading={isLoading}
-        onTypingChange={handleTypingChange}
-      />
+      <Box
+        style={{
+          // Make the input sticky on mobile
+          ...(isMobile
+            ? {
+                position: 'sticky',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 10,
+                backgroundColor: 'var(--background)',
+                borderTop: '1px solid var(--gray-5)',
+              }
+            : {}),
+        }}
+      >
+        <MessageInput
+          onSubmit={handleMessageSubmit}
+          isLoading={isLoading}
+          onTypingChange={handleTypingChange}
+        />
+      </Box>
     </Flex>
   );
 }
