@@ -29,6 +29,7 @@ export interface CreateChatRequest {
     redactedId: string;
     password: string;
   };
+  attachment?: string;
 }
 
 export interface CreateMessageRequest {
@@ -39,6 +40,7 @@ export interface CreateMessageRequest {
     redactedId: string;
     password: string;
   };
+  attachment?: string;
 }
 
 // Todo List Types
@@ -105,9 +107,10 @@ export async function createChat(
   message: string,
   user: string,
   id?: string,
-  dbUrl?: { redactedUrl: string; redactedId: string; password: string }
+  dbUrl?: { redactedUrl: string; redactedId: string; password: string },
+  attachment?: string
 ): Promise<Chat> {
-  const payload: CreateChatRequest = { message, user, id, dbUrl };
+  const payload: CreateChatRequest = { message, user, id, dbUrl, attachment };
 
   const response = await fetch(`${API_URL}/chats`, {
     method: 'POST',
@@ -131,9 +134,10 @@ export async function addMessage(
   chatId: string,
   message: string,
   user: string,
-  dbUrl?: { redactedUrl: string; redactedId: string; password: string }
+  dbUrl?: { redactedUrl: string; redactedId: string; password: string },
+  attachment?: string
 ): Promise<{ messages: ChatMessage[] }> {
-  const payload: CreateMessageRequest = { message, user, dbUrl };
+  const payload: CreateMessageRequest = { message, user, dbUrl, attachment };
 
   const response = await fetch(`${API_URL}/chats/${chatId}/messages`, {
     method: 'POST',

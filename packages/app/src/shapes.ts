@@ -114,6 +114,7 @@ export interface Message extends MessageRow {
   created_at: Date;
   updated_at: Date;
   thinking_text: string;
+  attachment?: string;
 }
 
 export function messagesShapeConfig(chatId: string): ShapeOptions<Message> {

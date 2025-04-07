@@ -6,6 +6,7 @@ export type ChatMessage = {
   role: 'user' | 'agent';
   status: 'pending' | 'completed' | 'failed' | 'aborted';
   created_at: Date;
+  attachment?: string;
   dbUrl?: {
     redactedUrl: string;
     redactedId: string;
@@ -60,6 +61,7 @@ export interface CreateMessageRequest {
     redactedId: string;
     password: string;
   };
+  attachment?: string;
 }
 
 export interface ToolHandler {

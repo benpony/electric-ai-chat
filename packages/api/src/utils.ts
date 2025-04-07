@@ -14,6 +14,7 @@ export function rowToChatMessage(row: any): ChatMessage {
     created_at: row.created_at,
     role: row.role,
     status: row.status,
+    attachment: row.attachment || undefined,
   };
 }
 

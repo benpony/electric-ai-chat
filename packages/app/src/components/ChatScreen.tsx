@@ -10,7 +10,7 @@ import {
   Tooltip,
   Switch,
 } from '@radix-ui/themes';
-import { Menu, Send, FileText, Terminal } from 'lucide-react';
+import { Menu, Send, FileText, Terminal, Paperclip } from 'lucide-react';
 import { useSidebar } from './SidebarProvider';
 import { useChatSidebar } from './ChatSidebarProvider';
 import { useChat, useMessagesShape, useFilesShape, usePresenceShape } from '../shapes';
@@ -34,6 +34,7 @@ type Message = {
   chat_id: string;
   status: string;
   thinking_text: string;
+  attachment?: string;
 };
 
 interface MessageListProps {
@@ -46,10 +47,7 @@ interface MessageListProps {
 }
 
 interface MessageInputProps {
-  onSubmit: (
-    message: string,
-    dbUrl?: { redactedUrl: string; redactedId: string; password: string }
-  ) => void;
+  onSubmit: (message: string, attachment?: string) => void;
   isLoading: boolean;
   onTypingChange?: (isTyping: boolean) => void;
 }
@@ -63,6 +61,7 @@ interface UserPromptProps {
 // UserPrompt component to display user messages
 const UserPrompt = memo(({ message, isCurrentUser, multipleUsers }: UserPromptProps) => {
   const isSystemMessage = message.role === 'system';
+  const hasAttachment = Boolean(message.attachment);
 
   return (
     <Flex
@@ -123,6 +122,12 @@ const UserPrompt = memo(({ message, isCurrentUser, multipleUsers }: UserPromptPr
         <Text size="2" style={{ whiteSpace: 'pre-wrap' }}>
           {message.content}
         </Text>
+        {hasAttachment && (
+          <Flex align="center" gap="1" style={{ marginTop: '4px', opacity: 0.7 }}>
+            <Paperclip size={12} />
+            <Text size="1">Attachment</Text>
+          </Flex>
+        )}
       </Box>
     </Flex>
   );
@@ -199,6 +204,9 @@ const MessageList = memo(
 // MessageInput component for the form
 const MessageInput = memo(({ onSubmit, isLoading, onTypingChange }: MessageInputProps) => {
   const [message, setMessage] = useState('');
+  const [attachment, setAttachment] = useState<string | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { chatId } = useParams({ from: '/chat/$chatId' });
   const typingTimeoutRef = useRef<number | null>(null);
@@ -261,12 +269,11 @@ const MessageInput = memo(({ onSubmit, isLoading, onTypingChange }: MessageInput
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || isLoading) return;
-
-    // Process any database URL in the message
-    const { message: processedMessage, dbUrl } = processDatabaseUrl(message, chatId);
-    onSubmit(processedMessage, dbUrl);
+    if ((!message.trim() && !attachment) || isLoading) return;
+    onSubmit(message, attachment || undefined);
     setMessage('');
+    setAttachment(null);
+    setAttachmentName(null);
 
     // Clear typing status when submitting
     if (isTyping) {
@@ -278,6 +285,38 @@ const MessageInput = memo(({ onSubmit, isLoading, onTypingChange }: MessageInput
 
     if (textareaRef.current) {
       textareaRef.current.focus();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Only accept text files
+    if (!file.type.startsWith('text/') && !file.name.endsWith('.txt')) {
+      alert('Please select a text file');
+      return;
+    }
+
+    // Read the file content
+    const reader = new FileReader();
+    reader.onload = event => {
+      const content = event.target?.result as string;
+      setAttachment(content);
+      setAttachmentName(file.name);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleAttachmentClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const removeAttachment = () => {
+    setAttachment(null);
+    setAttachmentName(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -305,6 +344,32 @@ const MessageInput = memo(({ onSubmit, isLoading, onTypingChange }: MessageInput
     >
       <form onSubmit={handleSubmit}>
         <Box style={{ position: 'relative' }}>
+          {attachment && (
+            <Box
+              style={{
+                marginBottom: '8px',
+                padding: '8px',
+                backgroundColor: 'var(--gray-3)',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Flex align="center" gap="2">
+                <FileText size={16} />
+                <Text size="2">{attachmentName}</Text>
+              </Flex>
+              <IconButton
+                size="1"
+                variant="ghost"
+                onClick={removeAttachment}
+                style={{ color: 'var(--gray-11)' }}
+              >
+                ×
+              </IconButton>
+            </Box>
+          )}
           <TextArea
             ref={textareaRef}
             placeholder="Type a message..."
@@ -320,23 +385,51 @@ const MessageInput = memo(({ onSubmit, isLoading, onTypingChange }: MessageInput
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
                 e.preventDefault();
-                if (message.trim() && !isLoading) {
+                if ((message.trim() || attachment) && !isLoading) {
                   handleSubmit(e);
                 }
               }
             }}
           />
-          <Box style={{ position: 'absolute', bottom: '10px', right: '10px', zIndex: 1 }}>
+          <Flex
+            direction="row"
+            gap="2"
+            align="center"
+            style={{
+              position: 'absolute',
+              bottom: '10px',
+              right: '10px',
+              zIndex: 1,
+            }}
+          >
+            <IconButton
+              type="button"
+              size="2"
+              variant="ghost"
+              radius="full"
+              onClick={handleAttachmentClick}
+              disabled={isLoading}
+              style={{ color: 'var(--gray-11)' }}
+            >
+              <Paperclip size={16} />
+            </IconButton>
             <IconButton
               type="submit"
               size="2"
               variant="solid"
               radius="full"
-              disabled={!message.trim() || isLoading}
+              disabled={(!message.trim() && !attachment) || isLoading}
             >
               <Send size={16} />
             </IconButton>
-          </Box>
+          </Flex>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".txt,text/*"
+            style={{ display: 'none' }}
+          />
         </Box>
       </form>
     </Box>
@@ -612,7 +705,7 @@ export default function ChatScreen() {
     [chatId, username]
   );
 
-  const handleMessageSubmit = async (messageText: string) => {
+  const handleMessageSubmit = async (messageText: string, attachment?: string) => {
     try {
       setIsLoading(true);
 
@@ -622,14 +715,11 @@ export default function ChatScreen() {
       let dbUrlToSend = processedData.dbUrl;
 
       // If no database URL was found in this message, check if we have stored passwords
-      // for this chat and use the most recent one if available
       if (!dbUrlToSend) {
         const storedPasswords = getChatPasswords(chatId);
 
         if (storedPasswords.size > 0) {
           // Get the most recent database URL from the password store
-          // This assumes the latest entry is the one we want - alternatively we could
-          // create a specific function to get the latest password
           const entries = Array.from(storedPasswords.entries());
           const [latestRedactedId, latestPassword] = entries[entries.length - 1];
 
@@ -652,32 +742,27 @@ export default function ChatScreen() {
       }
 
       // Send message to API
-      await addMessage(chatId, messageToSend, username, dbUrlToSend);
+      await addMessage(chatId, messageToSend, username, dbUrlToSend, attachment);
 
       // Force scroll to bottom when user sends a message
       setShouldScrollToBottom(true);
 
       // For mobile, immediately scroll to bottom after sending a message
       if (isMobile) {
-        // Use a more direct approach for mobile
         setTimeout(() => {
-          // Find the content area element
           const contentArea = document.querySelector('.content-area');
           if (contentArea) {
-            // Scroll to the bottom
             contentArea.scrollTop = contentArea.scrollHeight;
           } else {
-            // Fallback to window scroll if content area not found
             window.scrollTo({
               top: document.documentElement.scrollHeight,
               behavior: 'smooth',
             });
           }
-        }, 100); // Small delay to ensure content is rendered
+        }, 100);
       }
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Could add error handling/display here
     } finally {
       setIsLoading(false);
     }

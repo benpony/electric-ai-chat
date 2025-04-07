@@ -196,7 +196,7 @@ app.post('/chats', async (c: Context) => {
 app.post('/chats/:id/messages', async (c: Context) => {
   const chatId = c.req.param('id');
   const body = await c.req.json();
-  const { message, user, dbUrl } = body as CreateMessageRequest;
+  const { message, user, dbUrl, attachment } = body as CreateMessageRequest;
 
   if (!message || !user) {
     return c.json({ error: 'Message and user are required' }, 400);
@@ -226,7 +226,8 @@ app.post('/chats/:id/messages', async (c: Context) => {
           m.role, 
           m.status, 
           m.created_at, 
-          m.updated_at
+          m.updated_at,
+          m.attachment
         FROM messages m
         LEFT JOIN LATERAL (
           SELECT string_agg(token_text, '') as tokens_content
@@ -251,9 +252,9 @@ app.post('/chats/:id/messages', async (c: Context) => {
 
       // Add user message to chat
       const [newMessage] = await sql`
-        INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at)
-        VALUES (${messageId}, ${chatId}, ${message}, ${user}, 'user', 'completed', NOW())
-        RETURNING id, content, user_name, role, status, created_at
+        INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, attachment)
+        VALUES (${messageId}, ${chatId}, ${message}, ${user}, 'user', 'completed', NOW(), ${attachment || null})
+        RETURNING id, content, user_name, role, status, created_at, attachment
       `;
 
       return { newMessage, rawMessages };

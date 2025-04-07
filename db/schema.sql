@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS messages (
     user_name TEXT,
     role message_role,
     status message_status,
-    thinking_text TEXT DEFAULT ''
+    thinking_text TEXT DEFAULT '',
+    attachment TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS tokens (

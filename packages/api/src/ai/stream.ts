@@ -202,11 +202,18 @@ Please avoid repeating these operations unless specifically requested by the use
           // Add stored system messages from previous interactions, if any
           ...storedSystemMessages,
           ...context.map(
-            msg =>
-              ({
+            msg => {
+              // If the message has an attachment, include it in the content
+              let content = msg.content;
+              if ('attachment' in msg && msg.attachment) {
+                content += `\n\n[ATTACHED FILE CONTENT]\n${msg.attachment}\n[END OF ATTACHED FILE]`;
+              }
+              
+              return {
                 role: msg.role === 'agent' ? 'assistant' : ('user' as const),
-                content: msg.content,
-              }) as ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam
+                content: content,
+              } as ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam;
+            }
           ),
           {
             role: 'assistant',
@@ -317,7 +324,7 @@ Please avoid repeating these operations unless specifically requested by the use
         tokenBuffer += content;
 
         const currentTime = Date.now();
-        if (currentTime - lastInsertTime >= 60 || tokenBuffer.length > 30) {
+        if (currentTime - lastInsertTime >= 16 || tokenBuffer.length > 30) {
           await db`
             INSERT INTO tokens (message_id, token_number, token_text)
             VALUES (${currentMessageId}, ${tokenNumber}, ${tokenBuffer})

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Box, Flex, Text, Heading, TextArea, IconButton } from '@radix-ui/themes';
-import { Send, Menu } from 'lucide-react';
+import { Send, Menu, Paperclip } from 'lucide-react';
 import { matchStream } from '@electric-sql/experimental';
 import { useSidebar } from './SidebarProvider';
 import { createChat } from '../api';
@@ -12,12 +12,15 @@ import { processDatabaseUrl } from '../utils/db-url';
 export default function NewChatScreen() {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [attachment, setAttachment] = useState<string | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const username = localStorage.getItem('username') || 'User';
   const { stream } = useChatsShape();
   const { toggleSidebar } = useSidebar();
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Focus input on mount
   useEffect(() => {
@@ -49,10 +52,42 @@ export default function NewChatScreen() {
     };
   }, []);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Only accept text files
+    if (!file.type.startsWith('text/') && !file.name.endsWith('.txt')) {
+      alert('Please select a text file');
+      return;
+    }
+
+    // Read the file content
+    const reader = new FileReader();
+    reader.onload = event => {
+      const content = event.target?.result as string;
+      setAttachment(content);
+      setAttachmentName(file.name);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleAttachmentClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const removeAttachment = () => {
+    setAttachment(null);
+    setAttachmentName(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!prompt.trim()) return;
+    if (!prompt.trim() && !attachment) return;
 
     try {
       setIsLoading(true);
@@ -70,7 +105,7 @@ export default function NewChatScreen() {
       });
 
       // Create a new chat via API with the pre-generated UUID
-      await createChat(processedMessage, username, chatId, dbUrl);
+      await createChat(processedMessage, username, chatId, dbUrl?.redactedUrl || '', attachment || undefined);
 
       // Wait for the chat to sync
       await matchPromise;
@@ -78,6 +113,14 @@ export default function NewChatScreen() {
 
       // Preload messages for the new chat
       await preloadMessages(chatId);
+
+      // Reset form
+      setPrompt('');
+      setAttachment(null);
+      setAttachmentName(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
 
       // Navigate to the new chat
       navigate({ to: `/chat/${chatId}` });
@@ -126,6 +169,32 @@ export default function NewChatScreen() {
           style={{ width: '100%', maxWidth: '800px', position: 'relative' }}
         >
           <Box className="textarea-with-button" style={{ position: 'relative' }}>
+            {attachment && (
+              <Box
+                style={{
+                  marginBottom: '8px',
+                  padding: '8px',
+                  backgroundColor: 'var(--gray-3)',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Flex align="center" gap="2">
+                  <Send size={16} />
+                  <Text size="2">{attachmentName}</Text>
+                </Flex>
+                <IconButton
+                  size="1"
+                  variant="ghost"
+                  onClick={removeAttachment}
+                  style={{ color: 'var(--gray-11)' }}
+                >
+                  ×
+                </IconButton>
+              </Box>
+            )}
             <TextArea
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
@@ -141,27 +210,69 @@ export default function NewChatScreen() {
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
                   e.preventDefault();
-                  if (prompt.trim()) {
+                  if (prompt.trim() || attachment) {
                     handleSubmit(e);
                   }
                 }
               }}
             />
 
-            <Box style={{ position: 'absolute', bottom: '12px', right: '12px', zIndex: 1 }}>
+            <Flex
+              direction="column"
+              gap="2"
+              align="center"
+              style={{
+                position: 'absolute',
+                bottom: '12px',
+                right: '12px',
+                zIndex: 1,
+              }}
+            >
+              <IconButton
+                type="button"
+                size="2"
+                variant="ghost"
+                radius="full"
+                onClick={handleAttachmentClick}
+                disabled={isLoading}
+                style={{
+                  color: 'var(--gray-11)',
+                  width: '36px',
+                  height: '36px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Paperclip size={16} />
+              </IconButton>
               <IconButton
                 type="submit"
                 size="2"
                 variant="solid"
                 radius="full"
-                disabled={!prompt.trim() || isLoading}
+                disabled={(!prompt.trim() && !attachment) || isLoading}
                 style={{
                   color: '#fff',
+                  width: '36px',
+                  height: '36px',
+                  padding: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 <Send size={16} />
               </IconButton>
-            </Box>
+            </Flex>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".txt,text/*"
+              style={{ display: 'none' }}
+            />
           </Box>
         </form>
       </Flex>
