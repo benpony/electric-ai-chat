@@ -201,20 +201,18 @@ Please avoid repeating these operations unless specifically requested by the use
           systemPrompt,
           // Add stored system messages from previous interactions, if any
           ...storedSystemMessages,
-          ...context.map(
-            msg => {
-              // If the message has an attachment, include it in the content
-              let content = msg.content;
-              if ('attachment' in msg && msg.attachment) {
-                content += `\n\n[ATTACHED FILE CONTENT]\n${msg.attachment}\n[END OF ATTACHED FILE]`;
-              }
-              
-              return {
-                role: msg.role === 'agent' ? 'assistant' : ('user' as const),
-                content: content,
-              } as ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam;
+          ...context.map(msg => {
+            // If the message has an attachment, include it in the content
+            let content = msg.content;
+            if ('attachment' in msg && msg.attachment) {
+              content += `\n\n[ATTACHED FILE CONTENT]\n${msg.attachment}\n[END OF ATTACHED FILE]`;
             }
-          ),
+
+            return {
+              role: msg.role === 'agent' ? 'assistant' : ('user' as const),
+              content: content,
+            } as ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam;
+          }),
           {
             role: 'assistant',
             content: '',

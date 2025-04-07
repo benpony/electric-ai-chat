@@ -33,7 +33,10 @@ export function extractDatabaseUrl(message: string): DatabaseUrlInfo | null {
 /**
  * Process a message containing a database URL
  */
-export function processDatabaseUrl(message: string, chatId: string): {
+export function processDatabaseUrl(
+  message: string,
+  chatId: string
+): {
   message: string;
   dbUrl?: { redactedUrl: string; redactedId: string; password: string };
 } {

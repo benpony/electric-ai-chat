@@ -359,7 +359,6 @@ async function processTodoListItems({
 
             // Add to completed tasks
             result.completedTasks.push(item.task);
-            
           } catch (taskError) {
             console.error(`Error processing task "${item.task}":`, taskError);
 

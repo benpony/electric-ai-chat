@@ -1,21 +1,23 @@
-export type ChatMessage = {
-  id: string;
-  chat_id: string;
-  content: string;
-  user_name: string;
-  role: 'user' | 'agent';
-  status: 'pending' | 'completed' | 'failed' | 'aborted';
-  created_at: Date;
-  attachment?: string;
-  dbUrl?: {
-    redactedUrl: string;
-    redactedId: string;
-    password: string;
-  };
-} | {
-  role: 'system';
-  content: string;
-};
+export type ChatMessage =
+  | {
+      id: string;
+      chat_id: string;
+      content: string;
+      user_name: string;
+      role: 'user' | 'agent';
+      status: 'pending' | 'completed' | 'failed' | 'aborted';
+      created_at: Date;
+      attachment?: string;
+      dbUrl?: {
+        redactedUrl: string;
+        redactedId: string;
+        password: string;
+      };
+    }
+  | {
+      role: 'system';
+      content: string;
+    };
 
 export interface ToolCall {
   id: string;

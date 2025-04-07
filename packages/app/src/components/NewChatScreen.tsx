@@ -105,7 +105,13 @@ export default function NewChatScreen() {
       });
 
       // Create a new chat via API with the pre-generated UUID
-      await createChat(processedMessage, username, chatId, dbUrl?.redactedUrl || '', attachment || undefined);
+      await createChat(
+        processedMessage,
+        username,
+        chatId,
+        dbUrl?.redactedUrl || '',
+        attachment || undefined
+      );
 
       // Wait for the chat to sync
       await matchPromise;
