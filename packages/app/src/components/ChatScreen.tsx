@@ -881,7 +881,7 @@ export default function ChatScreen() {
 
       {/* Main content area */}
       <Flex
-        className="content-area"
+        className={isMobile ? 'content-area' : ''}
         style={{
           flex: 1,
           overflow: 'hidden',
