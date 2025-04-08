@@ -3,13 +3,13 @@
 
 # Electric AI Chat
 
-AI chat application using Electric for resumeability, interruptability, multi-user and multi-agent sync. See the [Building&nbsp;collaborative&nbsp;AI&nbsp;apps](https://electric-sql.com/blog/2025/04/09/building-collaborative-ai-apps-on-sync) blog post for more context.
+AI chat application using Electric for resumeability, interruptability, multi-user and multi-agent sync. See the [Building&nbsp;AI&nbsp;apps&nbsp;on&nbsp;sync](https://electric-sql.com/blog/2025/04/09/building-ai-apps-on-sync) blog post for more context.
 
 ## ElectricSQL
 
 Electric is a Postgres sync engine. It solves the hard problems of sync for you, including partial replication, fan-out, and data delivery. See https://electric-sql.com for more information.
 
-## Building collaborative AI apps
+## Building AI apps on sync
 
 This is a demo application that shows how to build collaborative AI apps that use Electric to keep both agents and users in sync. It shows:
 
@@ -17,11 +17,9 @@ This is a demo application that shows how to build collaborative AI apps that us
 - live streaming of AI sessions with seamless resumeability and session continuity
 - real-time streaming of LLM tool responses
 
-See the [blog post](https://electric-sql.com/blog/2025/04/09/building-collaborative-ai-apps-on-sync) for more information. The demo is deployed at [electric-ai-chat.examples.electric-sql.cloud](https://electric-ai-chat.examples.electric-sql.cloud).
+The demo is deployed at [electric-ai-chat.examples.electric-sql.cloud](https://electric-ai-chat.examples.electric-sql.cloud). See the [blog post](https://electric-sql.com/blog/2025/04/09/building-ai-apps-on-sync) for more information.
 
 <!-- and can be seen running in the video below ... -->
-
-
 
 ## Getting Started
 
