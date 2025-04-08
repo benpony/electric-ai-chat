@@ -167,7 +167,6 @@ body {
   height: 56px;
   position: sticky;
   top: 0;
-  background-color: var(--background);
   z-index: 10;
 }
 

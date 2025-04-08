@@ -382,7 +382,8 @@ const MessageInput = memo(({ onSubmit, isLoading, onTypingChange }: MessageInput
               resize: 'none',
               minHeight: '40px',
               maxHeight: '20vh',
-              paddingRight: '56px',
+              paddingRight: '70px',
+              backgroundColor: 'transparent',
             }}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
@@ -421,6 +422,7 @@ const MessageInput = memo(({ onSubmit, isLoading, onTypingChange }: MessageInput
               variant="solid"
               radius="full"
               disabled={(!message.trim() && !attachment) || isLoading}
+              style={{ color: '#fff' }}
             >
               <Send size={16} />
             </IconButton>
@@ -554,7 +556,7 @@ export default function ChatScreen() {
 
   // Track AI message updates for scrolling purposes
   const [aiUpdateTrigger, setAiUpdateTrigger] = useState(0);
-  
+
   // Create a callback function to be passed to AiResponse
   const handleAiUpdate = useCallback(() => {
     // Only trigger scrolling if already at the bottom
@@ -607,7 +609,7 @@ export default function ChatScreen() {
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
-      
+
       // When resizing, check if we should force-scroll to bottom
       if (shouldScrollToBottom) {
         // Small delay to allow resize to complete
@@ -680,10 +682,9 @@ export default function ChatScreen() {
         }
       }
     };
-    
+
     // Scroll when messages change or AI updates
     scrollToBottomIfNeeded();
-    
   }, [messages, aiUpdateTrigger, shouldScrollToBottom, isMobile]);
 
   // Set initial scroll position when component mounts
@@ -827,7 +828,6 @@ export default function ChatScreen() {
                 position: 'sticky',
                 top: 0,
                 zIndex: 10,
-                backgroundColor: 'var(--background)',
               }
             : {}),
         }}
@@ -1016,7 +1016,6 @@ export default function ChatScreen() {
                 left: 0,
                 right: 0,
                 zIndex: 10,
-                backgroundColor: 'var(--background)',
                 borderTop: '1px solid var(--gray-5)',
               }
             : {}),

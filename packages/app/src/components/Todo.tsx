@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import { Flex, Text, Button, IconButton, Checkbox, Dialog, Box, TextArea } from '@radix-ui/themes';
-import { Trash2, SendHorizontal } from 'lucide-react';
+import { Trash2, SendHorizontal, Menu } from 'lucide-react';
 import { useTodoList, useTodoItemsShape, TodoItem } from '../shapes';
 import { createTodoItem, updateTodoItem, deleteTodoItem, deleteTodoList } from '../api';
+import { useSidebar } from './SidebarProvider';
 
 const Todo = () => {
   const { listId } = useParams({ from: '/todo/$listId' });
@@ -13,13 +14,25 @@ const Todo = () => {
   const [newTask, setNewTask] = useState('');
   const [loading, setLoading] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { toggleSidebar } = useSidebar();
 
   // Focus input on mount
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
+  }, []);
+
+  // Add event listener for window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const sortedItems = todoItems?.sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
@@ -106,9 +119,16 @@ const Todo = () => {
           height: '56px',
         }}
       >
-        <Text size="5" weight="medium">
-          {todoList.name}
-        </Text>
+        <Flex align="center" gap="2">
+          {isMobile && (
+            <IconButton variant="ghost" size="1" onClick={toggleSidebar}>
+              <Menu size={18} />
+            </IconButton>
+          )}
+          <Text size="5" weight="medium">
+            {todoList.name}
+          </Text>
+        </Flex>
         <IconButton variant="ghost" color="red" onClick={() => setIsDeleteModalOpen(true)}>
           <Trash2 size={18} />
         </IconButton>
@@ -201,7 +221,6 @@ const Todo = () => {
         align="center"
         style={{
           borderTop: '1px solid var(--border-color)',
-          backgroundColor: 'var(--color-panel)',
         }}
       >
         <form onSubmit={handleAddItem} style={{ display: 'flex', width: '100%' }}>
@@ -216,6 +235,7 @@ const Todo = () => {
                 resize: 'none',
                 minHeight: '40px',
                 paddingRight: '56px',
+                backgroundColor: 'transparent',
               }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
