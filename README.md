@@ -17,7 +17,7 @@ This is a demo application that shows how to build collaborative AI apps that us
 - live streaming of AI sessions with seamless resumeability and session continuity
 - real-time streaming of LLM tool responses
 
-The demo is deployed at [electric-ai-chat.examples.electric-sql.cloud](https://electric-ai-chat.examples.electric-sql.cloud). See the [blog post](https://electric-sql.com/blog/2025/04/09/building-ai-apps-on-sync) for more information.
+The demo is deployed at [electric-ai-chat.examples.electric-sql.com](https://electric-ai-chat.examples.electric-sql.com). See the [blog post](https://electric-sql.com/blog/2025/04/09/building-ai-apps-on-sync) for more information.
 
 <!-- and can be seen running in the video below ... -->
 
