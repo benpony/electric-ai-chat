@@ -133,7 +133,7 @@ Also do not ask if there is anything else they would like you to do.
       'Task Assistant',
       'agent',
       'pending',
-      ${`Processing task: "${item.task}"...`},
+      ${`Thinking about task...`},
       NOW(),
       NOW()
     )
@@ -282,7 +282,7 @@ async function processTodoListItems({
               // Update thinking text to say we're watching
               await db`
                 UPDATE messages
-                SET thinking_text = 'Watching for changes...', updated_at = NOW()
+                SET thinking_text = 'Watching for changes to list...', updated_at = NOW()
                 WHERE id = ${messageId}
               `;
               break;
@@ -310,7 +310,7 @@ async function processTodoListItems({
           // Update thinking text for specific task
           await db`
               UPDATE messages
-              SET thinking_text = ${`Processing task: "${item.task}"...`},
+              SET thinking_text = ${`Processing task: "${item.task.slice(0, 80)}..."`},
                   updated_at = NOW()
               WHERE id = ${messageId}
             `;
@@ -402,6 +402,8 @@ async function processTodoListItems({
       } catch (err) {
         streamAbortController.abort();
         reject(err);
+      } finally {
+        processingItems = false;
       }
     }
 

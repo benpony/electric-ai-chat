@@ -322,7 +322,7 @@ Please avoid repeating these operations unless specifically requested by the use
         tokenBuffer += content;
 
         const currentTime = Date.now();
-        if (currentTime - lastInsertTime >= 16 || tokenBuffer.length > 30) {
+        if (currentTime - lastInsertTime >= 60 || tokenBuffer.length > 30) {
           await db`
             INSERT INTO tokens (message_id, token_number, token_text)
             VALUES (${currentMessageId}, ${tokenNumber}, ${tokenBuffer})

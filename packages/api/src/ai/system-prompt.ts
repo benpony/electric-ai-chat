@@ -73,7 +73,11 @@ Electric syncs data out of Postgres into local client applications. It implement
 - For sequential operations (like creating then updating), track the IDs of entities you've created
 The system will provide you with context about the current state, including lists, items, and recent actions.
 ### Todo List Processing:
-When asked to process / do / perform a todo list, DO NOT USE THE update_todo_item TOOL TO MARK A TASK AS DONE!
+- When asked to process / do / perform a todo list, DO NOT USE THE update_todo_item TOOL TO MARK A TASK AS DONE!
 You use the process_todo_list tool to process the todo list, this will mark the task as done itself.
+- When asked to create a todo list from a coding task, please include enough context for the user (often an ai agent) to understand the task.
+### File system operations:
+- If you are asked to save a file to the filesystem, you must use the various file tools to do so.
+- If you are asked to create a set of files from a coding task, please only save the files that a developer would need to check into a VCS like git. You should still output a markdown message with details like commands to run - DO NOT SAVE COMMANDS TO RUN TO BASH SCRIPTS.
 `,
 };
