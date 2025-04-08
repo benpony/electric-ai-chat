@@ -1,83 +1,118 @@
+
+<!-- blog post header image extra-landscape crop -->
+
 # Electric AI Chat
 
-A multi-user AI chat application built with [ElectricSQL](https://electric-sql.com) that enables real-time collaboration and state synchronization. Multiple users can participate in AI-powered conversations simultaneously, with chat history and responses instantly synchronized across all connected devices. The application maintains perfect state consistency through ElectricSQL's robust sync engine, ensuring chat continuity even through page refreshes, network interruptions, or application restarts.
+AI chat application using Electric for resumeability, interruptability, multi-user and multi-agent sync. See the [Building&nbsp;collaborative&nbsp;AI&nbsp;apps](https://electric-sql.com/blog/2025/04/09/building-collaborative-ai-apps-on-sync) blog post for more context.
 
-This project demonstrates:
+## ElectricSQL
 
-- Real-time chat synchronization across multiple users, with the sidebar dynamically updating as new chats are created
-- Live streaming of AI responses to all connected clients through ElectricSQL, with seamless resumption of interrupted chats
-- Persistent chat history stored in the database, enabling session continuity across page reloads and perfect synchronization between users
-- Real-time streaming of LLM tool responses via ElectricSQL, powering features like:
-  - Chat pinning and renaming
-  - Live updates of AI-generated or modified files
-  - Immediate visibility of tool actions across all clients
-- Controlling the LLM process via ElectricSQL propagating the `stop` status to the agent process when a user clicks the stop button.
-- Todo List functionality with real-time collaborative editing and LLM automation
+Electric is a Postgres sync engine. It solves the hard problems of sync for you, including partial replication, fan-out, and data delivery. See https://electric-sql.com for more information.
 
-## Outline
+## Building collaborative AI apps
 
-- [What is Electric?](#what-is-electric)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [LLM Tools Integration](#llm-tools-integration)
-- [ElectricSQL Benefits for AI Applications](#electricsql-benefits-for-ai-applications)
-- [Getting Started](#getting-started)
-- [Project Structure](#project-structure)
-- [Features](#features)
-- [API Endpoints](#api-endpoints)
+This is a demo application that shows how to build collaborative AI apps that use Electric to keep both agents and users in sync. It shows:
 
-## What is Electric?
+- real-time multi-agent, multi-user and multi-device sync
+- live streaming of AI sessions with seamless resumeability and session continuity
+- real-time streaming of LLM tool responses
 
-Sync is the magic ingredient behind fast, modern software. From apps like Figma and Linear to AI agents running on live local data.
+See the [blog post](https://electric-sql.com/blog/2025/04/09/building-collaborative-ai-apps-on-sync) for more information. The demo is deployed at [electric-ai-chat.examples.electric-sql.cloud](https://electric-ai-chat.examples.electric-sql.cloud).
 
-Electric is a Postgres sync engine. It solves the hard problems of sync for you, including partial replication, fan-out, and data delivery. So you can build awesome software, without rolling your own sync.
+<!-- and can be seen running in the video below ... -->
 
-Specifically, Electric is a read-path sync engine for Postgres. It syncs data out of Postgres into ... anything you like. The core sync protocol is based on a low-level [HTTP API](https://electric-sql.com/docs/api/http). This integrates with CDNs for highly-scalable data delivery.
 
-Partial replication is managed using [Shapes](https://electric-sql.com/docs/guides/shapes). Sync can be consumed directly or via [client libraries](https://electric-sql.com/docs/api/clients/typescript) and [framework integrations](https://electric-sql.com/docs/api/integrations/react).
 
-## Tech Stack
+## Getting Started
 
-- **Frontend**: React 19, TypeScript, Vite, TanStack Router, Radix UI
-- **Backend**: Node.js, Hono (web framework), TypeScript
-- **Database**: PostgreSQL with ElectricSQL for local-first data sync
-- **AI Integration**: OpenAI API with tool calling capabilities
-- **Package Management**: pnpm
-- **Project Structure**: Monorepo with pnpm workspaces
+### Pre-reqs
 
-## Architecture
+- Node.js (v18 or higher)
+- pnpm (v8 or higher)
+- Docker and Docker Compose (for local development environment)
+- An OpenAI API key
 
-Electric AI Chat is built using a modern architecture with these key components:
+### Install
 
-1. **Frontend Application (packages/app)**
+Clone the repository and install dependencies:
 
-   - React-based single-page application
-   - Uses TanStack Router for client-side routing
-   - Uses Radix UI for UI components
-   - Implements light/dark theme support
-   - Connects to ElectricSQL for local-first data management
+```bash
+git clone https://github.com/electric-sql/ai-chat.git
+cd ai-chat
+pnpm install
+```
 
-2. **Backend API (packages/api)**
+### Develop
 
-   - Node.js API server using Hono web framework
-   - Provides REST endpoints for chat operations
-   - Handles user authentication and message processing
-   - Integrates with OpenAI's API for AI responses
-   - Implements tool calling for enhanced AI capabilities
+1. Start Postgres and Electric using Docker:
 
-3. **Database Layer**
+```bash
+docker-compose up -d
+```
 
-   - PostgreSQL database with ElectricSQL
-   - Schemas for chats, messages, and token storage
-   - ElectricSQL for real-time sync between clients and server
+2. Start the backend API:
 
-4. **Infrastructure**
-   - Docker Compose configuration for development environment
-   - Includes PostgreSQL and ElectricSQL services
+```bash
+cd packages/api
+export OPENAI_API_KEY=<your-openai-api-key>
+pnpm dev
+```
 
-## LLM Tools Integration
+3. Build and serve the frontend app:
 
-Electric AI Chat implements several LLM tools to enhance the AI assistant capabilities:
+```bash
+cd packages/app
+pnpm dev
+```
+
+Open the app in your browser at http://localhost:5173
+
+## Code structure
+
+```
+electric-ai-chat/
+├── packages/
+│   ├── app/       # React frontend application
+│   │   ├── src/   # Source code
+│   │   └── ...    # Configuration files
+│   └── api/       # Backend API server
+│       ├── src/   # API source code
+│       ├── ai/    # AI integration and tools
+│       └── ...    # Configuration files
+├── db/            # Database initialization scripts
+│   └── schema.sql # Database schema
+├── docker-compose.yaml # Docker configuration for development
+└── pnpm-workspace.yaml # Workspace configuration
+```
+
+## Stack
+
+1. **Front-end**
+
+   - React 19
+   - TypeScript
+   - Vite
+   - TanStack Router
+   - Radix UI
+
+2. **Back-end**:
+
+   - Node.js
+   - Hono (web framework)
+   - TypeScript
+
+3. **Database**:
+
+   - Postgres
+   - ElectricSQL for sync
+
+4. **AI**:
+
+   - OpenAI API with tool calling capabilities
+
+## Tools
+
+The demo app implements several LLM tools to enhance the AI assistant capabilities:
 
 1. **ElectricSQL Tools**
 
@@ -116,101 +151,3 @@ Electric AI Chat implements several LLM tools to enhance the AI assistant capabi
      - Real-time UI updates across multiple clients
      - Reactive programming patterns with AI integrations
      - Resumable operations that can survive page reloads or connection interruptions
-
-## ElectricSQL Benefits for AI Applications
-
-Electric AI Chat showcases how ElectricSQL enhances AI applications in several key ways:
-
-- **Resume-ability**: Chat sessions persist across page reloads and device restarts, allowing users to continue exactly where they left off without losing context or progress.
-
-- **Multi-User**: Multiple users can view and interact with the same chat simultaneously, with changes propagated in real-time across all connected clients.
-
-- **Decoupled UI Updates**: ElectricSQL enables UI updates throughout the application independent of the main chat stream. This means:
-
-  - Status indicators can update in real-time
-  - Side panels can refresh with new information
-  - Notifications can appear across the application
-  - All without interrupting or being tied to the main chat interaction
-
-- **Streaming Efficiency**: Token streaming from AI responses is handled efficiently, with ElectricSQL ensuring all clients receive updates in real-time.
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v18 or higher)
-- pnpm (v8 or higher)
-- Docker and Docker Compose (for local development environment)
-- An OpenAI API key
-
-### Installation
-
-Clone the repository and install dependencies:
-
-```bash
-git clone https://github.com/electric-sql/ai-chat.git
-cd ai-chat
-pnpm install
-```
-
-### Start the Development Environment
-
-1. Start the PostgreSQL and ElectricSQL services using Docker:
-
-```bash
-docker-compose up -d
-```
-
-2. Start the development API server:
-
-```bash
-cd packages/api
-export OPENAI_API_KEY=<your-openai-api-key>
-pnpm dev
-```
-
-3. Start the development frontend application:
-
-```bash
-cd packages/app
-pnpm dev
-```
-
-The frontend application will be available at http://localhost:5173
-The API server will be available at http://localhost:3001
-
-## Project Structure
-
-```
-ai-chat/
-├── packages/
-│   ├── app/       # React frontend application
-│   │   ├── src/   # Source code
-│   │   └── ...    # Configuration files
-│   └── api/       # Backend API server
-│       ├── src/   # API source code
-│       ├── ai/    # AI integration and tools
-│       └── ...    # Configuration files
-├── db/            # Database initialization scripts
-│   └── schema.sql # Database schema
-├── docker-compose.yaml # Docker configuration for development
-└── pnpm-workspace.yaml # Workspace configuration
-```
-
-## Features
-
-- User authentication (local storage based)
-- Chat creation and management
-- Real-time chat interface with AI responses
-- AI tool calling for enhanced capabilities
-- Message streaming support
-- Offline capability with ElectricSQL
-- Responsive design
-- Light and dark theme support
-- Todo List Management
-  - Create and manage multiple todo lists
-  - Real-time collaborative editing of todo items
-  - Mark items as complete/incomplete with instant sync
-  - AI-assisted task automation via LLM tools
-  - Watch mode for continuous task processing
-  - Event-driven architecture using ElectricSQL shape streams

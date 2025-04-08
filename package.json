@@ -1,7 +1,7 @@
 {
-  "name": "electric-chat",
-  "version": "1.0.0",
-  "description": "Multi-user AI chat application",
+  "name": "electric-ai-chat",
+  "version": "0.2.0",
+  "description": "AI chat application using Electric for resumeability, interruptability, multi-user and multi-agent sync.",
   "private": true,
   "scripts": {
     "dev": "concurrently \"pnpm dev:app-for-caddy\" \"pnpm dev:api\" \"pnpm dev:caddy\"",
