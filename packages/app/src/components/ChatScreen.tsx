@@ -44,6 +44,7 @@ interface MessageListProps {
   scrollContentRef: React.RefObject<HTMLDivElement>;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   typingUsers: string[];
+  onAiUpdate?: () => void;
 }
 
 interface MessageInputProps {
@@ -142,6 +143,7 @@ const MessageList = memo(
     scrollContentRef,
     messagesEndRef,
     typingUsers,
+    onAiUpdate,
   }: MessageListProps) => {
     const usernames = new Set(
       messages.filter(msg => msg.role === 'user').map(msg => msg.user_name)
@@ -178,7 +180,7 @@ const MessageList = memo(
                 }}
               >
                 {msg.role === 'agent' ? (
-                  <AiResponse message={msg} />
+                  <AiResponse message={msg} onUpdate={onAiUpdate} />
                 ) : (
                   <UserPrompt
                     message={msg}
@@ -445,6 +447,7 @@ export default function ChatScreen() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const scrollContentRef = useRef<HTMLDivElement>(null);
+  const mobileContentAreaRef = useRef<HTMLDivElement>(null); // New ref for mobile content area
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
   const username = localStorage.getItem('username') || 'User';
   const { toggleSidebar } = useSidebar();
@@ -549,6 +552,17 @@ export default function ChatScreen() {
   // Filter messages based on the toggle state
   const messages = allMessages.filter(msg => showSystemMessages || msg.role !== 'system');
 
+  // Track AI message updates for scrolling purposes
+  const [aiUpdateTrigger, setAiUpdateTrigger] = useState(0);
+  
+  // Create a callback function to be passed to AiResponse
+  const handleAiUpdate = useCallback(() => {
+    // Only trigger scrolling if already at the bottom
+    if (shouldScrollToBottom) {
+      setAiUpdateTrigger(prev => prev + 1);
+    }
+  }, [shouldScrollToBottom]);
+
   // Define CSS variables for theming that will adapt to dark mode
   const themeVariables = {
     '--color-background-message': 'var(--gray-3)',
@@ -593,34 +607,51 @@ export default function ChatScreen() {
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
+      
+      // When resizing, check if we should force-scroll to bottom
+      if (shouldScrollToBottom) {
+        // Small delay to allow resize to complete
+        setTimeout(() => {
+          if (window.innerWidth < 768) {
+            // For mobile
+            const contentArea = mobileContentAreaRef.current;
+            if (contentArea) {
+              contentArea.scrollTop = contentArea.scrollHeight;
+            }
+          } else if (messagesEndRef.current) {
+            // For desktop
+            messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+          }
+        }, 100);
+      }
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [shouldScrollToBottom]);
 
   // Check if user is scrolled to bottom
   useEffect(() => {
     const handleScroll = () => {
       if (isMobile) {
-        // For mobile, check the content area scroll position
-        const contentArea = document.querySelector('.content-area');
+        // For mobile, check the content area scroll position using ref
+        const contentArea = mobileContentAreaRef.current;
         if (contentArea) {
           const { scrollTop, scrollHeight, clientHeight } = contentArea;
-          const isAtBottom = scrollHeight - scrollTop - clientHeight < 20; // 20px threshold
+          const isAtBottom = scrollHeight - scrollTop - clientHeight < 30; // 30px threshold
           setShouldScrollToBottom(isAtBottom);
         }
       } else if (scrollAreaRef.current) {
         // For desktop, check the ScrollArea scroll position
         const { scrollTop, scrollHeight, clientHeight } = scrollAreaRef.current;
-        const isAtBottom = scrollHeight - scrollTop - clientHeight < 20; // 20px threshold
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 30; // 30px threshold
         setShouldScrollToBottom(isAtBottom);
       }
     };
 
     if (isMobile) {
       // For mobile, add scroll listener to content area
-      const contentArea = document.querySelector('.content-area');
+      const contentArea = mobileContentAreaRef.current;
       if (contentArea) {
         contentArea.addEventListener('scroll', handleScroll);
         return () => contentArea.removeEventListener('scroll', handleScroll);
@@ -632,16 +663,14 @@ export default function ChatScreen() {
     }
   }, [isMobile]);
 
-  // Set up mutation observer to detect content changes
+  // Scroll to bottom when messages change or AI updates occur
   useEffect(() => {
-    if (!scrollContentRef.current) return;
-
     // Function to scroll to bottom if needed
     const scrollToBottomIfNeeded = () => {
       if (shouldScrollToBottom) {
         if (isMobile) {
           // For mobile, scroll the content area
-          const contentArea = document.querySelector('.content-area');
+          const contentArea = mobileContentAreaRef.current;
           if (contentArea) {
             contentArea.scrollTop = contentArea.scrollHeight;
           }
@@ -651,49 +680,34 @@ export default function ChatScreen() {
         }
       }
     };
+    
+    // Scroll when messages change or AI updates
+    scrollToBottomIfNeeded();
+    
+  }, [messages, aiUpdateTrigger, shouldScrollToBottom, isMobile]);
 
-    // Create mutation observer
-    const observer = new MutationObserver(mutations => {
-      // Check if there were meaningful changes that should trigger a scroll
-      const hasContentChanges = mutations.some(
-        mutation =>
-          mutation.type === 'childList' ||
-          mutation.type === 'characterData' ||
-          (mutation.type === 'attributes' && mutation.attributeName === 'style')
-      );
-
-      if (hasContentChanges) {
-        scrollToBottomIfNeeded();
-      }
-    });
-
-    // Start observing
-    observer.observe(scrollContentRef.current, {
-      childList: true, // Observe direct children changes
-      subtree: true, // Observe all descendants
-      characterData: true, // Observe text content changes
-      attributes: true, // Observe attribute changes
-    });
-
-    // Cleanup
-    return () => observer.disconnect();
-  }, [shouldScrollToBottom, isMobile]);
-
-  // Scroll to bottom when messages change or component mounts
+  // Set initial scroll position when component mounts
   useEffect(() => {
-    if (shouldScrollToBottom) {
-      if (isMobile) {
-        // For mobile, scroll the content area
-        const contentArea = document.querySelector('.content-area');
-        if (contentArea) {
-          contentArea.scrollTop = contentArea.scrollHeight;
+    // If we have messages, start at the bottom
+    if (messages.length > 0) {
+      // Set a small delay to ensure elements are rendered
+      setTimeout(() => {
+        if (isMobile) {
+          // For mobile
+          const contentArea = mobileContentAreaRef.current;
+          if (contentArea) {
+            contentArea.scrollTop = contentArea.scrollHeight;
+            // Ensure we're tracking that we should stay at the bottom
+            setShouldScrollToBottom(true);
+          }
+        } else if (messagesEndRef.current) {
+          // For desktop
+          messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+          setShouldScrollToBottom(true);
         }
-      } else if (messagesEndRef.current) {
-        // For desktop, scroll the ScrollArea
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
+      }, 200);
     }
-  }, [messages, shouldScrollToBottom, isMobile]);
+  }, []);
 
   // Function to handle typing status change
   const handleTypingChange = useCallback(
@@ -750,7 +764,7 @@ export default function ChatScreen() {
       // For mobile, immediately scroll to bottom after sending a message
       if (isMobile) {
         setTimeout(() => {
-          const contentArea = document.querySelector('.content-area');
+          const contentArea = mobileContentAreaRef.current;
           if (contentArea) {
             contentArea.scrollTop = contentArea.scrollHeight;
           } else {
@@ -882,6 +896,7 @@ export default function ChatScreen() {
       {/* Main content area */}
       <Flex
         className={isMobile ? 'content-area' : ''}
+        ref={isMobile ? mobileContentAreaRef : undefined}
         style={{
           flex: 1,
           overflow: 'hidden',
@@ -951,7 +966,7 @@ export default function ChatScreen() {
                     }}
                   >
                     {msg.role === 'agent' ? (
-                      <AiResponse message={msg} />
+                      <AiResponse message={msg} onUpdate={handleAiUpdate} />
                     ) : (
                       <UserPrompt
                         message={msg}
@@ -981,6 +996,7 @@ export default function ChatScreen() {
               scrollContentRef={scrollContentRef}
               messagesEndRef={messagesEndRef}
               typingUsers={typingUsers}
+              onAiUpdate={handleAiUpdate}
             />
           )}
         </Box>

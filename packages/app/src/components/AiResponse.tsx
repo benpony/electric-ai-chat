@@ -262,11 +262,11 @@ const MarkdownMessage = memo(function MarkdownMessage({ content }: { content: st
   );
 });
 
-const AiResponse = memo(({ message }: { message: Message }) => {
+const AiResponse = memo(({ message, onUpdate }: { message: Message; onUpdate?: () => void }) => {
   if (message.status === 'completed') {
     return <CompletedMessage message={message} />;
   } else if (message.status === 'pending') {
-    return <PendingMessage message={message} />;
+    return <PendingMessage message={message} onUpdate={onUpdate} />;
   } else if (message.status === 'aborted') {
     return <AbortedMessage message={message} />;
   } else {
@@ -287,7 +287,7 @@ function CompletedMessage({ message }: { message: Message }) {
   );
 }
 
-function PendingMessage({ message }: { message: Message }) {
+function PendingMessage({ message, onUpdate }: { message: Message; onUpdate?: () => void }) {
   const { data: tokens } = useTokensShape(message.id);
   const tokenText = tokens?.map(token => token.token_text).join('');
   const [isAborting, setIsAborting] = useState(false);
@@ -298,8 +298,10 @@ function PendingMessage({ message }: { message: Message }) {
   useEffect(() => {
     if (tokenText) {
       setLastUpdateTime(Date.now());
+      // Notify parent component of the update
+      onUpdate?.();
     }
-  }, [tokenText]);
+  }, [tokenText, onUpdate]);
 
   // Set up timeout to trigger re-render when updates are stale
   useEffect(() => {
