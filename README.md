@@ -35,8 +35,8 @@ The demo is deployed at [electric-ai-chat.examples.electric-sql.cloud](https://e
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/electric-sql/ai-chat.git
-cd ai-chat
+git clone https://github.com/electric-sql/electric-ai-chat.git
+cd electric-ai-chat
 pnpm install
 ```
 
