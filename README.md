@@ -45,25 +45,23 @@ pnpm install
 1. Start Postgres and Electric using Docker:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 2. Start the backend API:
 
 ```bash
-cd packages/api
 export OPENAI_API_KEY=<your-openai-api-key>
-pnpm dev
+pnpm dev:api
 ```
 
 3. Build and serve the frontend app:
 
 ```bash
-cd packages/app
-pnpm dev
+pnpm dev:app
 ```
 
-Open the app in your browser at http://localhost:5173
+Open in your browser at http://localhost:5173
 
 ## Code structure
 
