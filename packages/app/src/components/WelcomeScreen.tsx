@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Box, Flex, Text, Heading, Button, IconButton, Tooltip } from '@radix-ui/themes';
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
+import AboutSection from './AboutSection';
 
 export default function WelcomeScreen() {
   const [username, setUsername] = useState('');
@@ -122,6 +123,7 @@ export default function WelcomeScreen() {
             </Flex>
           </form>
         </Box>
+        <AboutSection />
       </Flex>
     </Flex>
   );
