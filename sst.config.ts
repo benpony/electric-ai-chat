@@ -31,6 +31,7 @@ export default $config({
     const schemaFile = `./db/schema.sql`;
     const neonProjectId = new sst.Secret(`NeonProjectId`);
     const subdomain = `examples.${isProduction ? `electric-sql.com` : `electric-sql.dev`}`;
+    const demoDomainTitle = `electric-ai-chat`;
 
     // Iniitalize a database
     let dbUrl: $util.Input<string>;
@@ -86,6 +87,14 @@ export default $config({
         context: `electric/packages/sync-service`,
       },
       architecture: getSystemArch(),
+      health: {
+        command: [`CMD-SHELL`, `curl -fsS http://localhost:3000/v1/health > /dev/null`],
+        // allow some time for system to start and recover
+        startPeriod: `30 seconds`,
+        // retry for a total of 3 minutes
+        interval: `30 seconds`,
+        retries: 6,
+      },
       environment: {
         ELECTRIC_INSECURE: $jsonStringify(true),
         DATABASE_URL: dbUrl,
@@ -119,7 +128,7 @@ export default $config({
         loadBalancer: {
           ports: [{ listen: '443/https', forward: `${backendPort}/http` }],
           domain: {
-            name: `${isProduction ? `ai-chat-api` : `ai-chat-api${$app.stage}`}.${subdomain}`,
+            name: `${isProduction ? `${demoDomainTitle}-api` : `${demoDomainTitle}-api-${$app.stage}`}.${subdomain}`,
             dns: sst.cloudflare.dns(),
           },
         },
@@ -147,11 +156,11 @@ export default $config({
       `AiChatFrontend`,
       {
         domain: {
-          name: `${isProduction ? `ai-chat` : `ai-chat-${$app.stage}`}.${subdomain}`,
+          name: `${isProduction ? `${demoDomainTitle}` : `${demoDomainTitle}-${$app.stage}`}.${subdomain}`,
           dns: sst.cloudflare.dns(),
         },
         environment: {
-          VITE_API_URL: $dev ? backend.url : `http://localhost:${backendPort}`,
+          VITE_API_URL: $dev ? `http://localhost:${backendPort}` : backend.url,
         },
         path: `packages/app`,
         build: {
