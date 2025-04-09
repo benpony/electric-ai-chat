@@ -24,6 +24,7 @@ export default $config({
     };
   },
   async run() {
+    const { getFileChecksum } = await import('./utils/file-hash');
     const isProduction = $app.stage.toLocaleLowerCase() === `production`;
     const region = `us-east-1`;
     const clearAllFile = `./db/clear-all.sql`;
@@ -35,8 +36,8 @@ export default $config({
     const frontendDomain = `${isProduction ? `${demoDomainTitle}` : `${demoDomainTitle}-${$app.stage}`}.${subdomain}`;
 
     // Add schema hash to db name to blow up on schema changes
-    const schemaHash = getFileChecksum(schemaFile, 8);
-    const dbName = $interpolate`${isProduction ? `ai-chat` : `ai-chat-${$app.stage}`}-${schemaHash}`;
+    const schemaHash = getFileChecksum(schemaFile, 10);
+    const dbName = `${isProduction ? `ai-chat` : `ai-chat-${$app.stage}`}-${schemaHash}`;
 
     // Iniitalize a database
     let dbUrl: $util.Input<string>;
@@ -326,13 +327,4 @@ async function getSystemArch(): Promise<`x86_64` | `arm64`> {
     default:
       throw new Error(`Cannot build docker image on arch ${currentArch} - must be x86_64 or arm64`);
   }
-}
-
-async function getFileChecksum(path: string, length?: number): Promise<string> {
-  const fs = await import('node:fs');
-  const crypto = await import('node:crypto');
-  const fileBuffer = fs.readFileSync(path);
-  const hashSum = crypto.createHash('sha256');
-  hashSum.update(fileBuffer);
-  return hashSum.digest('hex').slice(0, length);
 }
