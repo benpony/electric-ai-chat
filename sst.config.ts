@@ -92,7 +92,7 @@ export default $config({
       : $interpolate`http://${syncService.service}:3000`;
 
     // Backend for proxying and other endpoints
-    const openAiKey = new sst.Secret(`OpenAiKey`, process.env.OPEN_AI_KEY);
+    const openAiKey = new sst.Secret(`OpenAiKey`);
     const backendPort = 3001;
     const backend = new sst.aws.Service(
       `AiChatBackend`,
