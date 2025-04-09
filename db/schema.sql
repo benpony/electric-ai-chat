@@ -7,8 +7,16 @@ CREATE TABLE IF NOT EXISTS chats (
     pinned BOOLEAN DEFAULT FALSE
 );
 
-CREATE TYPE message_status AS ENUM ('pending', 'completed', 'failed', 'aborted');
-CREATE TYPE message_role AS ENUM ('user', 'agent', 'system');
+DO $$ BEGIN
+    CREATE TYPE message_status AS ENUM ('pending', 'completed', 'failed', 'aborted');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+DO $$ BEGIN
+    CREATE TYPE message_role AS ENUM ('user', 'agent', 'system');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY,

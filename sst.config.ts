@@ -25,8 +25,6 @@ export default $config({
   },
   async run() {
     const isProduction = $app.stage.toLocaleLowerCase() === `production`;
-    const forceRedeployToken = `${Date.now()}`;
-    const dbName = isProduction ? `ai-chat` : `ai-chat-${$app.stage}`;
     const region = `us-east-1`;
     const clearAllFile = `./db/clear-all.sql`;
     const schemaFile = `./db/schema.sql`;
@@ -35,6 +33,10 @@ export default $config({
     const demoDomainTitle = `electric-ai-chat`;
     const backendDomain = `${isProduction ? `${demoDomainTitle}-api` : `${demoDomainTitle}-api-${$app.stage}`}.${subdomain}`;
     const frontendDomain = `${isProduction ? `${demoDomainTitle}` : `${demoDomainTitle}-${$app.stage}`}.${subdomain}`;
+
+    // Add schema hash to db name to blow up on schema changes
+    const schemaHash = getFileChecksum(schemaFile, 8);
+    const dbName = `${isProduction ? `ai-chat` : `ai-chat-${$app.stage}`}-${schemaHash}`;
 
     // Iniitalize a database
     let dbUrl: $util.Input<string>;
@@ -69,10 +71,8 @@ export default $config({
     }
 
     dbUrl = $resolve([dbUrl, roleName]).apply(async ([dbUrl, roleName]) => {
-      console.log(`Clearing all database contents`);
-      await runSqlFile(dbUrl, clearAllFile, roleName);
       console.log(`Running necessary migrations`);
-      await runSqlFile(dbUrl, schemaFile, roleName);
+      await runSqlFile(dbUrl, schemaFile);
       return dbUrl;
     });
 
@@ -104,7 +104,6 @@ export default $config({
           ELECTRIC_INSECURE: $jsonStringify(true),
           DATABASE_URL: dbUrl,
           ELECTRIC_QUERY_DATABASE_URL: pooledDbUrl,
-          FORCE_REDEPLOY: forceRedeployToken,
         },
         dev: {
           directory: `electric/packages/sync-service`,
@@ -155,7 +154,6 @@ export default $config({
           OPENAI_MODEL: 'gpt-4o-mini',
           OPENAI_API_KEY: openAiKey.value,
           PORT: $jsonStringify(backendPort),
-          FORCE_REDEPLOY: forceRedeployToken,
         },
         dev: {
           directory: `packages/api/`,
@@ -299,7 +297,7 @@ function createNeonDb({
   });
 }
 
-async function runSqlFile(connectionString: string, filePath: string, roleName?: string) {
+async function runSqlFile(connectionString: string, filePath: string) {
   const { Client } = await import('pg');
   const { readFileSync } = await import('fs');
 
@@ -308,11 +306,6 @@ async function runSqlFile(connectionString: string, filePath: string, roleName?:
   try {
     await client.connect();
     let sql = readFileSync(filePath, 'utf8');
-    // TODO(stefanos): hacky but it'll do to fix neon
-    if (roleName && filePath.endsWith(`clear-all.sql`)) {
-      console.log(`Replacing 'postgres' role with '${roleName}'`);
-      sql = sql.replace(/postgres/g, roleName);
-    }
     await client.query(sql);
   } catch (err) {
     console.error(`Failed to run SQL:`, err);
@@ -333,4 +326,13 @@ async function getSystemArch(): Promise<`x86_64` | `arm64`> {
     default:
       throw new Error(`Cannot build docker image on arch ${currentArch} - must be x86_64 or arm64`);
   }
+}
+
+async function getFileChecksum(path: string, length?: number): Promise<string> {
+  const fs = await import('node:fs');
+  const crypto = await import('node:crypto');
+  const fileBuffer = fs.readFileSync(path);
+  const hashSum = crypto.createHash('sha256');
+  hashSum.update(fileBuffer);
+  return hashSum.digest('hex').slice(0, length);
 }
