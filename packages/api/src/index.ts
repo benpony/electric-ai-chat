@@ -11,7 +11,7 @@ import { createAIResponse, generateChatName, ENABLE_AI } from './ai/index.js';
 
 // Access the Electric API URL
 const ELECTRIC_API_URL = process.env.ELECTRIC_API_URL || 'http://localhost:3000';
-const FRONTEND_DOMAIN = process.env.FRONTEND_DOMAIN || 'http://localhost:5173';
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 
 const app = new Hono();
 
@@ -20,7 +20,7 @@ app.use(
   '/*',
   cors({
     origin: [
-      FRONTEND_DOMAIN,
+      FRONTEND_ORIGIN,
       'http://localhost:5173',
       'https://localhost:5173',
       'http://localhost:3000',
