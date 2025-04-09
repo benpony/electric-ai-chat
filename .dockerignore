@@ -1,0 +1,6 @@
+
+# Ignore everything but packages that build an image and pnpm deps
+**
+!pnpm-*.yaml
+!package.json
+!packages/api/**

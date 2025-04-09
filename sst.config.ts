@@ -98,7 +98,10 @@ export default $config({
       `AiChatBackend`,
       {
         cluster,
-        image: {},
+        image: {
+          context: `.`,
+          dockerfile: `packages/api/Dockerfile`,
+        },
         loadBalancer: {
           ports: [{ listen: '443/https', forward: `${backendPort}/http` }],
           domain: {
@@ -109,8 +112,8 @@ export default $config({
         environment: {
           DATABASE_URL: pooledDbUrl,
           ELECTRIC_API_URL: syncServiceUrl,
-          OPEN_AI_MODEL: 'gpt-4o-mini',
-          OPEN_AI_KEY: openAiKey.value,
+          OPENAI_MODEL: 'gpt-4o-mini',
+          OPENAI_API_KEY: openAiKey.value,
           PORT: $jsonStringify(backendPort),
         },
         dev: {
