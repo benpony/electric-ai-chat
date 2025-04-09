@@ -37,6 +37,7 @@ export default $config({
     // Add schema hash to db name to blow up on schema changes
     const schemaHash = getFileChecksum(schemaFile, 10);
     const dbName = `${isProduction ? `ai-chat` : `ai-chat-${$app.stage}`}-${schemaHash}`;
+    const replicationStreamId = `${$app.stage}_ai_chat`.replace(/-/g, `_`);
 
     // Iniitalize a database
     let dbUrl: $util.Input<string>;
@@ -115,9 +116,12 @@ export default $config({
           retries: 6,
         },
         environment: {
-          ELECTRIC_INSECURE: $jsonStringify(true),
+          ELECTRIC_DB_POOL_SIZE: $jsonStringify(isProduction ? 20 : 5),
+          ELECTRIC_REPLICATION_STREAM_ID: replicationStreamId,
           DATABASE_URL: dbUrl,
           ELECTRIC_QUERY_DATABASE_URL: pooledDbUrl,
+          ELECTRIC_INSECURE: $jsonStringify(true),
+          ELECTRIC_LOG_COLORS: $jsonStringify(false),
         },
         dev: {
           directory: `electric/packages/sync-service`,
