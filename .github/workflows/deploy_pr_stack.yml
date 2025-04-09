@@ -63,7 +63,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const frontend = process.env.frontend;
-            const backe nd = process.env.backend;
+            const backend = process.env.backend;
             const prNumber = context.issue.number;
             const commentBody = `- frontend: ${frontend}
             - backend: ${backend} 
