@@ -22,43 +22,68 @@ export default $config({
     const isProduction = $app.stage.toLocaleLowerCase() === `production`;
     const dbName = isProduction ? `ai-chat` : `ai-chat-${$app.stage}`;
     const region = `us-east-1`;
-
     const neonProjectId = new sst.Secret(`NeonProjectId`);
-    const neonProject = neon.getProjectOutput({ id: neonProjectId.value });
+    const subdomain = `examples.${isProduction ? `electric-sql.com` : `electric-sql.dev`}`;
 
-    const neonDb = createNeonDb({
-      projectId: neonProject.id,
-      branchId: neonProject.defaultBranchId,
-      dbName,
-    });
-    const dbConfig = {
-      project: neonProject,
-      databaseName: neonDb.dbName,
-      roleName: neonDb.ownerName,
-    };
-    const dbUrl = getNeonConnectionString({ ...dbConfig, pooled: false });
-    const pooledDbUrl = getNeonConnectionString({ ...dbConfig, pooled: true });
+    // Iniitalize a database
+    let dbUrl: $util.Input<string>;
+    let pooledDbUrl: $util.Input<string>;
+    if ($dev) {
+      new sst.x.DevCommand(`AiChatPostgres`, {
+        dev: {
+          title: `Postgres`,
+          command: `docker-compose -f ./.support/docker-compose.yml up`,
+          autostart: true,
+        },
+      });
+      dbUrl = `postgresql://postgres:password@localhost:54321/ai-chat`;
+      pooledDbUrl = dbUrl;
+    } else {
+      const neonProject = neon.getProjectOutput({ id: neonProjectId.value });
+      const neonDb = createNeonDb({
+        projectId: neonProject.id,
+        branchId: neonProject.defaultBranchId,
+        dbName,
+      });
+      const dbConfig = {
+        project: neonProject,
+        databaseName: neonDb.dbName,
+        roleName: neonDb.ownerName,
+      };
+      dbUrl = getNeonConnectionString({ ...dbConfig, pooled: false });
+      pooledDbUrl = getNeonConnectionString({ ...dbConfig, pooled: true });
+    }
 
+    // Initialize AWS services
     const provider = new aws.Provider(`AiChatProvider`, { region });
     const vpc = new sst.aws.Vpc(`AiChatVpc`, { nat: `ec2` }, { provider });
     const cluster = new sst.aws.Cluster(`AiChatCluster`, { forceUpgrade: `v2`, vpc }, { provider });
 
+    // Electric for syncing
     const syncService = new sst.aws.Service(`AiChatSyncService`, {
       cluster,
-      image: {},
+      image: {
+        context: `electric/packages/sync-service`,
+      },
       environment: {
         ELECTRIC_INSECURE: $jsonStringify(true),
         DATABASE_URL: dbUrl,
         ELECTRIC_QUERY_DATABASE_URL: pooledDbUrl,
       },
       dev: {
-        command: `docker run`,
+        directory: `electric/packages/sync-service`,
+        command: `iex -S mix`,
         autostart: true,
       },
     });
 
+    const syncServiceUrl = $dev
+      ? `http://localhost:3000`
+      : $interpolate`http://${syncService.service}:3000`;
+
+    // Backend for proxying and other endpoints
     const openAiKey = new sst.Secret(`OpenAiKey`, process.env.OPEN_AI_KEY);
-    const backendPort = $dev ? 3002 : 3001;
+    const backendPort = 3001;
     const backend = new sst.aws.Service(
       `AiChatBackend`,
       {
@@ -66,17 +91,22 @@ export default $config({
         image: {},
         loadBalancer: {
           ports: [{ listen: '443/https', forward: `${backendPort}/http` }],
+          domain: {
+            name: `${isProduction ? `ai-chat-api` : `ai-chat-api${$app.stage}`}.${subdomain}`,
+            dns: sst.cloudflare.dns(),
+          },
         },
         environment: {
           DATABASE_URL: pooledDbUrl,
-          ELECTRIC_API_URL: `http://${syncService.service}:3000`,
+          ELECTRIC_API_URL: syncServiceUrl,
           OPEN_AI_MODEL: 'gpt-4o-mini',
           OPEN_AI_KEY: openAiKey.value,
           PORT: $jsonStringify(backendPort),
         },
         dev: {
+          directory: `packages/api/`,
           command: `pnpm dev:caddy`,
-          directory: `packages/app`,
+          url: `https://localhost:${backendPort}`,
           autostart: true,
         },
       },
@@ -85,11 +115,12 @@ export default $config({
       }
     );
 
+    // Frontend for actual chat app
     const frontend = new sst.aws.StaticSite(
       `AiChatFrontend`,
       {
         domain: {
-          name: `${isProduction ? `ai-chat` : `ai-chat-${$app.stage}`}.examples.electric-sql.com`,
+          name: `${isProduction ? `ai-chat` : `ai-chat-${$app.stage}`}.${subdomain}`,
           dns: sst.cloudflare.dns(),
         },
         environment: {
@@ -111,9 +142,10 @@ export default $config({
     );
 
     return {
+      dbUrl: $dev ? dbUrl : `REDACTED`,
       frontend: frontend.url,
       backend: backend.url,
-      syncService: syncService.url,
+      syncService: syncServiceUrl,
     };
   },
 });

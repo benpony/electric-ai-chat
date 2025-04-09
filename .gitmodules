@@ -1,0 +1,4 @@
+[submodule "electric"]
+	path = electric
+	url = https://github.com/electric-sql/electric.git
+	branch = samwillis/experimental-live-sse
