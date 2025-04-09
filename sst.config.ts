@@ -22,6 +22,8 @@ export default $config({
     const isProduction = $app.stage.toLocaleLowerCase() === `production`;
     const dbName = isProduction ? `ai-chat` : `ai-chat-${$app.stage}`;
     const region = `us-east-1`;
+    const clearAllFile = `./db/clear-all.sql`;
+    const schemaFile = `./db/schema.sql`;
     const neonProjectId = new sst.Secret(`NeonProjectId`);
     const subdomain = `examples.${isProduction ? `electric-sql.com` : `electric-sql.dev`}`;
 
@@ -53,6 +55,14 @@ export default $config({
       dbUrl = getNeonConnectionString({ ...dbConfig, pooled: false });
       pooledDbUrl = getNeonConnectionString({ ...dbConfig, pooled: true });
     }
+
+    dbUrl = $output(dbUrl).apply(async dbUrl => {
+      console.log(`Clearing all database contents`);
+      await runSqlFile(dbUrl, clearAllFile);
+      console.log(`Running necessary migrations`);
+      await runSqlFile(dbUrl, schemaFile);
+      return dbUrl;
+    });
 
     // Initialize AWS services
     const provider = new aws.Provider(`AiChatProvider`, { region });
@@ -150,7 +160,7 @@ export default $config({
   },
 });
 
-export function getNeonConnectionString({
+function getNeonConnectionString({
   project,
   roleName,
   databaseName,
@@ -183,7 +193,7 @@ export function getNeonConnectionString({
  * Uses the [Neon API](https://neon.tech/docs/manage/databases) along with
  * a Pulumi Command resource and `curl` to create and delete Neon databases.
  */
-export function createNeonDb({
+function createNeonDb({
   projectId,
   branchId,
   dbName,
@@ -243,4 +253,19 @@ export function createNeonDb({
       throw new Error(`Failed to create Neon database ${dbName}: ${stdout}`);
     }
   });
+}
+
+async function runSqlFile(connectionString: string, filePath: string) {
+  const { Client } = await import('pg');
+  const { readFileSync } = await import('fs');
+
+  const client = new Client({ connectionString });
+
+  try {
+    await client.connect();
+    const sql = readFileSync(filePath, 'utf8');
+    await client.query(sql);
+  } finally {
+    await client.end();
+  }
 }
