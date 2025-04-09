@@ -72,7 +72,21 @@ export default $config({
 
     dbUrl = $resolve([dbUrl, roleName]).apply(async ([dbUrl, roleName]) => {
       console.log(`Running necessary migrations`);
-      await runSqlFile(dbUrl, schemaFile);
+      const startTime = Date.now();
+      const timeoutMs = 30 * 1000;
+      while (Date.now() - startTime < timeoutMs) {
+        try {
+          await runSqlFile(dbUrl, schemaFile);
+          break;
+        } catch (err) {
+          if (err.message.includes(`database "${dbName}" does not exist`)) {
+            await new Promise(res => setTimeout(res, 2000));
+            continue;
+          }
+          throw err;
+        }
+      }
+
       return dbUrl;
     });
 
