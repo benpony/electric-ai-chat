@@ -32,6 +32,7 @@ export default $config({
     const neonProjectId = new sst.Secret(`NeonProjectId`);
     const subdomain = `examples.${isProduction ? `electric-sql.com` : `electric-sql.dev`}`;
     const demoDomainTitle = `electric-ai-chat`;
+    const frontendDomain = `${isProduction ? `${demoDomainTitle}` : `${demoDomainTitle}-${$app.stage}`}.${subdomain}`;
 
     // Iniitalize a database
     let dbUrl: $util.Input<string>;
@@ -135,6 +136,7 @@ export default $config({
         environment: {
           DATABASE_URL: pooledDbUrl,
           ELECTRIC_API_URL: syncServiceUrl,
+          FRONTEND_DOMAIN: frontendDomain,
           OPENAI_MODEL: 'gpt-4o-mini',
           OPENAI_API_KEY: openAiKey.value,
           PORT: $jsonStringify(backendPort),
@@ -156,7 +158,7 @@ export default $config({
       `AiChatFrontend`,
       {
         domain: {
-          name: `${isProduction ? `${demoDomainTitle}` : `${demoDomainTitle}-${$app.stage}`}.${subdomain}`,
+          name: frontendDomain,
           dns: sst.cloudflare.dns(),
         },
         environment: {
