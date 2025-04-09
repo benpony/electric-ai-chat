@@ -36,7 +36,7 @@ export default $config({
 
     // Add schema hash to db name to blow up on schema changes
     const schemaHash = getFileChecksum(schemaFile, 8);
-    const dbName = `${isProduction ? `ai-chat` : `ai-chat-${$app.stage}`}-${schemaHash}`;
+    const dbName = $interpolate`${isProduction ? `ai-chat` : `ai-chat-${$app.stage}`}-${schemaHash}`;
 
     // Iniitalize a database
     let dbUrl: $util.Input<string>;
