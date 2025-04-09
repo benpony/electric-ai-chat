@@ -9,7 +9,7 @@ export default function AboutSection() {
       <Text size="2" color="gray">
         This is a demo AI chat application using Electric for resumeability, interruptability,
         multi-user and multi-agent sync. See the{' '}
-        <a href="https://electric-sql.com/blog/building-ai-apps-on-sync">
+        <a href="https://electric-sql.com/blog/2025/04/09/building-ai-apps-on-sync">
           Building AI apps on sync
         </a>{' '}
         blog post for more context.
