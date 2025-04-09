@@ -144,7 +144,7 @@ export default $config({
         },
         path: `packages/app`,
         build: {
-          command: `pnpm build`,
+          command: `pnpm --filter electric-chat-app... build`,
           output: `dist`,
         },
         dev: {
