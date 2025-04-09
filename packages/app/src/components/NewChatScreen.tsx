@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Box, Flex, Text, Heading, TextArea, IconButton } from '@radix-ui/themes';
+import { Box, Flex, Text, Heading, TextArea, IconButton, ScrollArea } from '@radix-ui/themes';
 import { Send, Menu, Paperclip } from 'lucide-react';
 import { matchStream } from '@electric-sql/experimental';
 import { useSidebar } from './SidebarProvider';
@@ -149,138 +149,140 @@ export default function NewChatScreen() {
         </Flex>
       </Box>
 
-      <Flex
-        direction="column"
-        align="center"
-        justify="center"
-        style={{
-          height: '100%',
-          width: '100%',
-          padding: '16px',
-        }}
-      >
-        <Box width="100%" mb="6" style={{ maxWidth: '800px' }}>
-          <Heading align="center" size="5" weight="medium">
-            Start a New Chat
-          </Heading>
-        </Box>
-
-        <form
-          onSubmit={handleSubmit}
-          style={{ width: '100%', maxWidth: '800px', position: 'relative' }}
+      <ScrollArea style={{ height: '100%', width: '100%' }}>
+        <Flex
+          direction="column"
+          align="center"
+          justify="center"
+          style={{
+            height: '100%',
+            width: '100%',
+            padding: '16px',
+          }}
         >
-          <Box className="textarea-with-button" style={{ position: 'relative' }}>
-            {attachment && (
-              <Box
-                style={{
-                  marginBottom: '8px',
-                  padding: '8px',
-                  backgroundColor: 'var(--gray-3)',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Flex align="center" gap="2">
-                  <Send size={16} />
-                  <Text size="2">{attachmentName}</Text>
-                </Flex>
-                <IconButton
-                  size="1"
-                  variant="ghost"
-                  onClick={removeAttachment}
-                  style={{ color: 'var(--gray-11)' }}
-                >
-                  ×
-                </IconButton>
-              </Box>
-            )}
-            <TextArea
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              placeholder="Type a message to start a chat..."
-              size="3"
-              ref={inputRef}
-              style={{
-                height: '240px',
-                width: '100%',
-                resize: 'none',
-                ['--scrollarea-scrollbar-vertical-margin-right' as string]: '56px',
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
-                  e.preventDefault();
-                  if (prompt.trim() || attachment) {
-                    handleSubmit(e);
-                  }
-                }
-              }}
-            />
-
-            <Flex
-              direction="column"
-              gap="2"
-              align="center"
-              style={{
-                position: 'absolute',
-                bottom: '12px',
-                right: '12px',
-                zIndex: 1,
-              }}
-            >
-              <IconButton
-                type="button"
-                size="2"
-                variant="ghost"
-                radius="full"
-                onClick={handleAttachmentClick}
-                disabled={isLoading}
-                style={{
-                  color: 'var(--gray-11)',
-                  width: '36px',
-                  height: '36px',
-                  padding: '0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Paperclip size={16} />
-              </IconButton>
-              <IconButton
-                type="submit"
-                size="2"
-                variant="solid"
-                radius="full"
-                disabled={(!prompt.trim() && !attachment) || isLoading}
-                style={{
-                  color: '#fff',
-                  width: '36px',
-                  height: '36px',
-                  padding: '0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Send size={16} />
-              </IconButton>
-            </Flex>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".txt,text/*"
-              style={{ display: 'none' }}
-            />
+          <Box width="100%" mb="6" style={{ maxWidth: '800px' }}>
+            <Heading align="center" size="5" weight="medium">
+              Start a New Chat
+            </Heading>
           </Box>
-        </form>
-        
-        <Box style={{ marginTop: '24px' }}>
-          <AboutSection />
-        </Box>
-      </Flex>
+
+          <form
+            onSubmit={handleSubmit}
+            style={{ width: '100%', maxWidth: '800px', position: 'relative' }}
+          >
+            <Box className="textarea-with-button" style={{ position: 'relative' }}>
+              {attachment && (
+                <Box
+                  style={{
+                    marginBottom: '8px',
+                    padding: '8px',
+                    backgroundColor: 'var(--gray-3)',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <Flex align="center" gap="2">
+                    <Send size={16} />
+                    <Text size="2">{attachmentName}</Text>
+                  </Flex>
+                  <IconButton
+                    size="1"
+                    variant="ghost"
+                    onClick={removeAttachment}
+                    style={{ color: 'var(--gray-11)' }}
+                  >
+                    ×
+                  </IconButton>
+                </Box>
+              )}
+              <TextArea
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                placeholder="Type a message to start a chat..."
+                size="3"
+                ref={inputRef}
+                style={{
+                  height: '240px',
+                  width: '100%',
+                  resize: 'none',
+                  ['--scrollarea-scrollbar-vertical-margin-right' as string]: '56px',
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    if (prompt.trim() || attachment) {
+                      handleSubmit(e);
+                    }
+                  }
+                }}
+              />
+
+              <Flex
+                direction="column"
+                gap="2"
+                align="center"
+                style={{
+                  position: 'absolute',
+                  bottom: '12px',
+                  right: '12px',
+                  zIndex: 1,
+                }}
+              >
+                <IconButton
+                  type="button"
+                  size="2"
+                  variant="ghost"
+                  radius="full"
+                  onClick={handleAttachmentClick}
+                  disabled={isLoading}
+                  style={{
+                    color: 'var(--gray-11)',
+                    width: '36px',
+                    height: '36px',
+                    padding: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Paperclip size={16} />
+                </IconButton>
+                <IconButton
+                  type="submit"
+                  size="2"
+                  variant="solid"
+                  radius="full"
+                  disabled={(!prompt.trim() && !attachment) || isLoading}
+                  style={{
+                    color: '#fff',
+                    width: '36px',
+                    height: '36px',
+                    padding: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Send size={16} />
+                </IconButton>
+              </Flex>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".txt,text/*"
+                style={{ display: 'none' }}
+              />
+            </Box>
+          </form>
+
+          <Box style={{ marginTop: '24px' }}>
+            <AboutSection />
+          </Box>
+        </Flex>
+      </ScrollArea>
     </Flex>
   );
 }
