@@ -30,6 +30,7 @@ export default $config({
     // Iniitalize a database
     let dbUrl: $util.Input<string>;
     let pooledDbUrl: $util.Input<string>;
+    let roleName: $util.Input<string>;
     if ($dev) {
       new sst.x.DevCommand(`AiChatPostgres`, {
         dev: {
@@ -40,6 +41,7 @@ export default $config({
       });
       dbUrl = `postgresql://postgres:password@localhost:54321/ai-chat`;
       pooledDbUrl = dbUrl;
+      roleName = `postgres`;
     } else {
       const neonProject = neon.getProjectOutput({ id: neonProjectId.value });
       const neonDb = createNeonDb({
@@ -54,6 +56,7 @@ export default $config({
       };
       dbUrl = getNeonConnectionString({ ...dbConfig, pooled: false });
       pooledDbUrl = getNeonConnectionString({ ...dbConfig, pooled: true });
+      roleName = neonDb.ownerName;
     }
 
     dbUrl = $output(dbUrl).apply(async dbUrl => {
@@ -258,7 +261,7 @@ function createNeonDb({
   });
 }
 
-async function runSqlFile(connectionString: string, filePath: string) {
+async function runSqlFile(connectionString: string, filePath: string, roleName?: string) {
   const { Client } = await import('pg');
   const { readFileSync } = await import('fs');
 
@@ -267,6 +270,10 @@ async function runSqlFile(connectionString: string, filePath: string) {
   try {
     await client.connect();
     const sql = readFileSync(filePath, 'utf8');
+    // TODO(stefanos): hacky but it'll do to fix neon
+    if (roleName && filePath.endsWith(`clear-all.sql`)) {
+      sql.replace(/postgres/g, roleName);
+    }
     await client.query(sql);
   } finally {
     await client.end();
