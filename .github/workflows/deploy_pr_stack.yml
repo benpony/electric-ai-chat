@@ -75,7 +75,7 @@ jobs:
               issue_number: prNumber,
             });
 
-            const existingComment = comments.find(comment => comment.user.login ==='github-actions[bot]' && comment.body.startsWith("- admin site URL:"));
+            const existingComment = comments.find(comment => comment.user.login ==='github-actions[bot]' && comment.body.startsWith("- frontend:"));
 
             if (existingComment) {
               // Update the existing comment
