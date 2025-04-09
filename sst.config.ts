@@ -269,10 +269,10 @@ async function runSqlFile(connectionString: string, filePath: string, roleName?:
 
   try {
     await client.connect();
-    const sql = readFileSync(filePath, 'utf8');
+    let sql = readFileSync(filePath, 'utf8');
     // TODO(stefanos): hacky but it'll do to fix neon
     if (roleName && filePath.endsWith(`clear-all.sql`)) {
-      sql.replace(/postgres/g, roleName);
+      sql = sql.replace(/postgres/, roleName);
     }
     await client.query(sql);
   } finally {
