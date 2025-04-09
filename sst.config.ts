@@ -25,6 +25,7 @@ export default $config({
   },
   async run() {
     const isProduction = $app.stage.toLocaleLowerCase() === `production`;
+    const forceRedeployToken = `${Date.now()}`;
     const dbName = isProduction ? `ai-chat` : `ai-chat-${$app.stage}`;
     const region = `us-east-1`;
     const clearAllFile = `./db/clear-all.sql`;
@@ -81,33 +82,38 @@ export default $config({
     const cluster = new sst.aws.Cluster(`AiChatCluster`, { forceUpgrade: `v2`, vpc }, { provider });
 
     // Electric for syncing
-    const syncService = new sst.aws.Service(`AiChatSyncService`, {
-      cluster,
-      cpu: isProduction ? `2 vCPU` : `0.25 vCPU`,
-      memory: isProduction ? `4 GB` : `0.5 GB`,
-      image: {
-        context: `electric/packages/sync-service`,
+    const syncService = new sst.aws.Service(
+      `AiChatSyncService`,
+      {
+        cluster,
+        cpu: isProduction ? `2 vCPU` : `0.25 vCPU`,
+        memory: isProduction ? `4 GB` : `0.5 GB`,
+        image: {
+          context: `electric/packages/sync-service`,
+        },
+        architecture: getSystemArch(),
+        health: {
+          command: [`CMD-SHELL`, `curl -fsS http://localhost:3000/v1/health > /dev/null`],
+          // allow some time for system to start and recover
+          startPeriod: `30 seconds`,
+          // retry for a total of 3 minutes
+          interval: `30 seconds`,
+          retries: 6,
+        },
+        environment: {
+          ELECTRIC_INSECURE: $jsonStringify(true),
+          DATABASE_URL: dbUrl,
+          ELECTRIC_QUERY_DATABASE_URL: pooledDbUrl,
+          FORCE_REDEPLOY: forceRedeployToken,
+        },
+        dev: {
+          directory: `electric/packages/sync-service`,
+          command: `iex -S mix`,
+          autostart: true,
+        },
       },
-      architecture: getSystemArch(),
-      health: {
-        command: [`CMD-SHELL`, `curl -fsS http://localhost:3000/v1/health > /dev/null`],
-        // allow some time for system to start and recover
-        startPeriod: `30 seconds`,
-        // retry for a total of 3 minutes
-        interval: `30 seconds`,
-        retries: 6,
-      },
-      environment: {
-        ELECTRIC_INSECURE: $jsonStringify(true),
-        DATABASE_URL: dbUrl,
-        ELECTRIC_QUERY_DATABASE_URL: pooledDbUrl,
-      },
-      dev: {
-        directory: `electric/packages/sync-service`,
-        command: `iex -S mix`,
-        autostart: true,
-      },
-    });
+      {}
+    );
 
     const syncServiceUrl = $dev
       ? `http://localhost:3000`
@@ -149,6 +155,7 @@ export default $config({
           OPENAI_MODEL: 'gpt-4o-mini',
           OPENAI_API_KEY: openAiKey.value,
           PORT: $jsonStringify(backendPort),
+          FORCE_REDEPLOY: forceRedeployToken,
         },
         dev: {
           directory: `packages/api/`,
@@ -185,7 +192,7 @@ export default $config({
           url: `http://localhost:5173/`,
         },
       },
-      { provider }
+      { provider, dependsOn: [backend] }
     );
 
     return {

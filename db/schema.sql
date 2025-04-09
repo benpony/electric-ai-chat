@@ -1,3 +1,4 @@
+BEGIN;
 CREATE TABLE IF NOT EXISTS chats (
     id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -103,3 +104,4 @@ END $$;
 CREATE INDEX IF NOT EXISTS user_presence_chat_id_idx ON user_presence (chat_id);
 -- Index for efficient cleanup of stale presence records
 CREATE INDEX IF NOT EXISTS user_presence_last_seen_idx ON user_presence (last_seen);
+COMMIT;
