@@ -59,11 +59,11 @@ export default $config({
       roleName = neonDb.ownerName;
     }
 
-    dbUrl = $output(dbUrl).apply(async dbUrl => {
+    dbUrl = $resolve([dbUrl, roleName]).apply(async ([dbUrl, roleName]) => {
       console.log(`Clearing all database contents`);
-      await runSqlFile(dbUrl, clearAllFile);
+      await runSqlFile(dbUrl, clearAllFile, roleName);
       console.log(`Running necessary migrations`);
-      await runSqlFile(dbUrl, schemaFile);
+      await runSqlFile(dbUrl, schemaFile, roleName);
       return dbUrl;
     });
 
@@ -272,7 +272,8 @@ async function runSqlFile(connectionString: string, filePath: string, roleName?:
     let sql = readFileSync(filePath, 'utf8');
     // TODO(stefanos): hacky but it'll do to fix neon
     if (roleName && filePath.endsWith(`clear-all.sql`)) {
-      sql = sql.replace(/postgres/, roleName);
+      console.log(`Replacing 'postgres' role with '${roleName}'`);
+      sql = sql.replace(/postgres/g, roleName);
     }
     await client.query(sql);
   } finally {
