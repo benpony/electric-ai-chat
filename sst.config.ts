@@ -27,7 +27,6 @@ export default $config({
     const { getFileChecksum } = await import('./utils/file-hash');
     const isProduction = $app.stage.toLocaleLowerCase() === `production`;
     const region = `us-east-1`;
-    const clearAllFile = `./db/clear-all.sql`;
     const schemaFile = `./db/schema.sql`;
     const neonProjectId = new sst.Secret(`NeonProjectId`);
     const subdomain = `examples.${isProduction ? `electric-sql.com` : `electric-sql.dev`}`;
