@@ -8,6 +8,7 @@ import { createChat } from '../api';
 import { useChatsShape, preloadMessages } from '../shapes';
 import { v4 as uuidv4 } from 'uuid';
 import { processDatabaseUrl } from '../utils/db-url';
+import AboutSection from './AboutSection';
 
 export default function NewChatScreen() {
   const [prompt, setPrompt] = useState('');
@@ -275,6 +276,10 @@ export default function NewChatScreen() {
             />
           </Box>
         </form>
+        
+        <Box style={{ marginTop: '24px' }}>
+          <AboutSection />
+        </Box>
       </Flex>
     </Flex>
   );
