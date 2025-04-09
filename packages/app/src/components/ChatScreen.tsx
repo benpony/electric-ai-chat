@@ -211,7 +211,7 @@ const MessageInput = memo(({ onSubmit, isLoading, onTypingChange }: MessageInput
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { chatId } = useParams({ from: '/chat/$chatId' });
-  const typingTimeoutRef = useRef<number | null>(null);
+  const typingTimeoutRef = useRef<number | NodeJS.Timeout | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const lastTypingStatus = useRef(false);
 

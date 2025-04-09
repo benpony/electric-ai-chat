@@ -23,9 +23,13 @@
     "packages/*"
   ],
   "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/pg": "^8.11.6",
     "prettier": "^3.2.4"
   },
   "dependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "pg": "^8.12.0",
+    "sst": "^3.13.5"
   }
 }

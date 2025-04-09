@@ -1,8 +1,8 @@
 // Backend API URL
-const VITE_API_URL: string | undefined = import.meta.env.VITE_API_URL;
-export const API_URL =
-  (VITE_API_URL?.startsWith('/') ? document.location.origin + VITE_API_URL : VITE_API_URL) ||
-  'http://localhost:3001';
+const VITE_API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+export const API_URL = VITE_API_URL?.startsWith('/')
+  ? new URL(document.location.origin + VITE_API_URL).origin
+  : new URL(VITE_API_URL).origin;
 
 // Types
 export interface ChatMessage {

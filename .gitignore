@@ -51,3 +51,7 @@ Thumbs.db
 
 # Vite
 .vite/ 
+
+# SST
+.sst
+.env
