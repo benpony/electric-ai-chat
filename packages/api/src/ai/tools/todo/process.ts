@@ -71,15 +71,17 @@ async function processTodoListItem({
   item,
   abortSignal,
 }: ProcessTodoListItemParams): Promise<void> {
-  console.log(`Processing task: ${item.task}`);
+  return new Promise(async (resolve, reject) => {
+    try {
+      console.log(`Processing task: ${item.task}`);
 
-  // Insert a "user" message about the task
-  await db`
-    INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
-    VALUES (
-      ${randomUUID()},
-      ${chatId},
-      ${`You are working through a todo list. Please perform the following task:
+      // Insert a "user" message about the task
+      await db`
+        INSERT INTO messages (id, chat_id, content, user_name, role, status, created_at, updated_at)
+        VALUES (
+          ${randomUUID()},
+          ${chatId},
+          ${`You are working through a todo list. Please perform the following task:
 
 ${item.task}
 
@@ -91,104 +93,93 @@ Please only use tools that are relevant to the task.
 Do let the user know what the task is that you are working on, but do not ask the user to do anything. 
 Also do not ask if there is anything else they would like you to do.
 `},
-      'Task Assistant',
-      'system',
-      'completed',
-      NOW(),
-      NOW()
-    )
-  `;
+          'Task Assistant',
+          'system',
+          'completed',
+          NOW(),
+          NOW()
+        )
+      `;
 
-  // Get the messages
-  const rawMessages = await db`
-    SELECT 
-      m.id, 
-      CASE 
-        WHEN m.status = 'pending' AND tokens_content IS NOT NULL THEN tokens_content
-        ELSE m.content
-      END as content,
-      m.user_name, 
-      m.role, 
-      m.status, 
-      m.created_at, 
-      m.updated_at
-    FROM messages m
-    LEFT JOIN LATERAL (
-      SELECT string_agg(token_text, '') as tokens_content
-      FROM tokens 
-      WHERE message_id = m.id
-      GROUP BY message_id
-    ) t ON m.status = 'pending'
-    WHERE m.chat_id = ${chatId}
-    ORDER BY m.created_at ASC
-  `;
+      // Get the messages
+      const rawMessages = await db`
+        SELECT 
+          m.id, 
+          CASE 
+            WHEN m.status = 'pending' AND tokens_content IS NOT NULL THEN tokens_content
+            ELSE m.content
+          END as content,
+          m.user_name, 
+          m.role, 
+          m.status, 
+          m.created_at, 
+          m.updated_at
+        FROM messages m
+        LEFT JOIN LATERAL (
+          SELECT string_agg(token_text, '') as tokens_content
+          FROM tokens 
+          WHERE message_id = m.id
+          GROUP BY message_id
+        ) t ON m.status = 'pending'
+        WHERE m.chat_id = ${chatId}
+        ORDER BY m.created_at ASC
+      `;
 
-  // Insert a "assistant" message about the task
-  const assistantMessageId = randomUUID();
-  await db`
-    INSERT INTO messages (id, chat_id, user_name, role, status, thinking_text, created_at, updated_at)
-    VALUES (
-      ${assistantMessageId},
-      ${chatId},
-      'Task Assistant',
-      'agent',
-      'pending',
-      ${`Thinking about task...`},
-      NOW(),
-      NOW()
-    )
-  `;
+      // Insert a "assistant" message about the task
+      const assistantMessageId = randomUUID();
+      await db`
+        INSERT INTO messages (id, chat_id, user_name, role, status, thinking_text, created_at, updated_at)
+        VALUES (
+          ${assistantMessageId},
+          ${chatId},
+          'Task Assistant',
+          'agent',
+          'pending',
+          ${`Thinking about task...`},
+          NOW(),
+          NOW()
+        )
+      `;
 
-  // Preprocess the messages
-  const messages = rawMessages.sort((a, b) => {
-    // If both messages are from agent, compare by updated_at
-    // if (a.role === 'agent' && b.role === 'agent') {
-    //   const timeA = a.updated_at.getTime();
-    //   const timeB = b.updated_at.getTime();
-    //   if (timeA === timeB) {
-    //     // If timestamps equal, pending messages come after non-pending
-    //     if (a.status === 'pending' && b.status !== 'pending') return 1;
-    //     if (a.status !== 'pending' && b.status === 'pending') return -1;
-    //   }
-    //   return timeA - timeB;
-    // }
-    // Otherwise compare by created_at
-    return a.updated_at.getTime() - b.updated_at.getTime();
+      // On abort set the message to aborted
+      abortSignal.addEventListener('abort', () => {
+        db`
+        UPDATE messages
+        SET status = 'aborted'
+        WHERE id = ${assistantMessageId}
+      `;
+        resolve();
+      });
+
+      // Preprocess the messages
+      const messages = rawMessages.sort((a, b) => {
+        return a.updated_at.getTime() - b.updated_at.getTime();
+      });
+      const context = messages.map(rowToChatMessage);
+
+      // Remove the last message if it is a assistant a with no content
+      if (
+        messages[messages.length - 1].role === 'agent' &&
+        messages[messages.length - 1].content === ''
+      ) {
+        context.pop();
+      }
+
+      console.log('>>> processing task');
+      await processAIStream({
+        chatId,
+        messageId: assistantMessageId,
+        context,
+        recursionDepth: 0,
+        excludeTools: [/todo/, /chat/],
+        abortSignal,
+      });
+      console.log('>>> done processing task');
+      resolve();
+    } catch (err) {
+      reject(err);
+    }
   });
-  const context = messages.map(rowToChatMessage);
-
-  // Remove the last message if it is a assistant a with no content
-  if (
-    messages[messages.length - 1].role === 'agent' &&
-    messages[messages.length - 1].content === ''
-  ) {
-    context.pop();
-  }
-
-  // Insert a system message about the task in the n-1 position
-  // context.splice(context.length - 1, 0, {
-  //   role: 'system',
-  //   content: `You need to perform the task in the next message. This is to be interpreted as though it is a message from the user.\n\nDO NOT USE THE update_todo_item OR delete_todo_item TOOLS TO MARK A TASK AS DONE - THIS IS VERY IMPORTANT!`,
-  // });
-
-  // Process the task
-  console.log('>>> processing task');
-  await processAIStream({
-    chatId,
-    messageId: assistantMessageId,
-    context,
-    recursionDepth: 0,
-    excludeTools: [/todo/, /chat/],
-  });
-  console.log('>>> done processing task');
-  // Update the assistant message to say we're done
-  // await db`
-  //   UPDATE messages
-  //   SET content = ${`this would be the output of the task`},
-  //       status = 'completed',
-  //       updated_at = NOW()
-  //   WHERE id = ${assistantMessageId}
-  // `;
 }
 
 interface ProcessTodoListItemsParams {
@@ -258,6 +249,9 @@ async function processTodoListItems({
 
     // We only want processItems once at a time.
     let processingItems = false;
+    // Track the current task being processed and its abort controller
+    let currentTaskId: string | null = null;
+    let currentTaskAbortController: AbortController | null = null;
 
     function nextItem() {
       return listItemsShape.currentRows.filter(
@@ -304,6 +298,19 @@ async function processTodoListItems({
           // Mark as in progress
           inProgressTaskIds.add(item.id);
 
+          // Set current task ID
+          currentTaskId = item.id;
+
+          // Create task-specific abort controller
+          currentTaskAbortController = new AbortController();
+
+          // Set up signal forwarding from parent to task controller
+          abortSignal.addEventListener('abort', () => {
+            if (currentTaskAbortController) {
+              currentTaskAbortController.abort();
+            }
+          });
+
           // Process the task
           console.log(`Processing task: ${item.task}`);
 
@@ -324,6 +331,8 @@ async function processTodoListItems({
             // Task completed by someone else
             inProgressTaskIds.delete(item.id);
             processedTaskIds.add(item.id);
+            currentTaskId = null;
+            currentTaskAbortController = null;
             result.abortedTasks.push(item.task);
             continue;
           }
@@ -335,7 +344,7 @@ async function processTodoListItems({
               chatId,
               messageId,
               item,
-              abortSignal,
+              abortSignal: currentTaskAbortController.signal,
             });
 
             // Mark task as done
@@ -391,6 +400,10 @@ async function processTodoListItems({
             // Mark as processed regardless of success/failure
             processedTaskIds.add(item.id);
 
+            // Clear current task tracking
+            currentTaskId = null;
+            currentTaskAbortController = null;
+
             // Update thinking text to be empty
             await db`
                 UPDATE messages
@@ -409,6 +422,20 @@ async function processTodoListItems({
 
     // Subscribe to changes in the todo items
     listItemsShape.subscribe(async () => {
+      // Check if there's a current task being processed that needs to be aborted
+      if (currentTaskId && currentTaskAbortController) {
+        // Check if the current task is still in the list and not marked as done
+        const currentTask = listItemsShape.currentRows.find(item => item.id === currentTaskId);
+
+        // Abort the current task if it's been deleted or marked as done
+        if (!currentTask || currentTask.done) {
+          console.log(`Aborting task ${currentTaskId} as it was deleted or marked as done`);
+          currentTaskAbortController.abort();
+          // The task cleanup will be handled in the finally block of the task processing
+        }
+      }
+
+      // Continue processing other items
       processItems();
     });
   });

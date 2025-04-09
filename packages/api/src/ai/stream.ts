@@ -31,6 +31,7 @@ export interface ProcessAIStreamParams {
   currentTokenBuffer?: string;
   currentLastInsertTime?: number;
   excludeTools?: (string | RegExp)[];
+  abortSignal?: AbortSignal;
 }
 
 // Process AI stream in background
@@ -46,6 +47,7 @@ export async function processAIStream({
   currentTokenBuffer = '',
   currentLastInsertTime = Date.now(),
   excludeTools = [],
+  abortSignal,
 }: ProcessAIStreamParams) {
   // Limit recursion depth to prevent infinite loops
   const MAX_RECURSION_DEPTH = 10;
@@ -76,6 +78,11 @@ export async function processAIStream({
         console.error('Error deleting tokens:', err);
       }
     }, 1000);
+  });
+
+  // Forward the abort signal to the abort controller
+  abortSignal?.addEventListener('abort', () => {
+    abortController.abort();
   });
 
   // Subscribe to the message
@@ -258,7 +265,7 @@ Please avoid repeating these operations unless specifically requested by the use
     ...basicTools,
     ...electricTools,
     ...fileTools,
-    ...postgresTools,
+    // ...postgresTools,
     ...todoTools,
   ].filter(tool => {
     for (const excludeTool of excludeTools) {
@@ -484,7 +491,7 @@ Please avoid repeating these operations unless specifically requested by the use
     // Update the message with error content
     await db`
       UPDATE messages
-      SET status = 'completed', 
+      SET status = 'aborted', 
           content = ${fullContent}, 
           thinking_text = '',
           updated_at = NOW()

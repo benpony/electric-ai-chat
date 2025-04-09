@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useMatchRoute } from '@tanstack/react-router';
-import { Flex, Text, Button, Dialog, TextField, Box } from '@radix-ui/themes';
+import { Flex, Text, Button, Dialog, TextField, Box, ScrollArea } from '@radix-ui/themes';
 import { useTodoListsShape } from '../shapes';
 import { createTodoList } from '../api';
 import { matchStream } from '@electric-sql/experimental';
@@ -52,100 +52,112 @@ const TodoLists = () => {
   };
 
   return (
-    <Flex direction="column" gap="2" my="0" pb="2" style={{ borderTop: '1px solid var(--gray-5)' }}>
-      <Flex direction="column" px="3" py="1">
-        <Flex justify="between" py="3" px="1" align="center">
-          <Text size="1" color="gray" weight="medium">
-            TODO LISTS
-          </Text>
-          <Button variant="ghost" size="1" onClick={() => setIsModalOpen(true)}>
-            + New
-          </Button>
-        </Flex>
-
-        <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <Dialog.Content size="2" style={{ maxWidth: 400 }}>
-            <Dialog.Title>Create New List</Dialog.Title>
-            <Dialog.Description size="2" mb="4">
-              Give your new to-do list a name.
-            </Dialog.Description>
-
-            <form onSubmit={handleCreateList}>
-              <Flex direction="column" gap="3">
-                <TextField.Root
-                  placeholder="List name"
-                  value={newListName}
-                  onChange={e => setNewListName(e.target.value)}
-                  disabled={loading}
-                  autoFocus
-                  style={{
-                    resize: 'none',
-                    minHeight: '40px',
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (newListName.trim() && !loading) {
-                        handleCreateList(e);
-                      }
-                    }
-                  }}
-                />
-
-                <Flex gap="3" mt="4" justify="end">
-                  <Dialog.Close>
-                    <Button variant="soft" color="gray">
-                      Cancel
-                    </Button>
-                  </Dialog.Close>
-                  <Button type="submit" disabled={loading || !newListName.trim()}>
-                    Create
-                  </Button>
-                </Flex>
-              </Flex>
-            </form>
-          </Dialog.Content>
-        </Dialog.Root>
-
-        {todoLists.length === 0 ? (
-          <Box px="1">
-            <Text size="1" color="gray">
-              No lists yet
+    <Flex
+      direction="column"
+      gap="2"
+      my="0"
+      pb="2"
+      style={{
+        borderTop: '1px solid var(--gray-5)',
+        maxHeight: 'calc(50vh - 100px)',
+        minHeight: '100px',
+      }}
+    >
+      <ScrollArea>
+        <Flex direction="column" px="3" py="1">
+          <Flex justify="between" py="3" px="1" align="center">
+            <Text size="1" color="gray" weight="medium">
+              TODO LISTS
             </Text>
-          </Box>
-        ) : (
-          todoLists.map(list => (
-            <Button
-              key={list.id}
-              variant="ghost"
-              color="gray"
-              size="1"
-              my="1"
-              mx="1"
-              style={{
-                justifyContent: 'flex-start',
-                height: '22px',
-                backgroundColor: list.id === currentListId ? 'var(--gray-5)' : undefined,
-                overflow: 'hidden',
-                color: 'var(--gray-12)',
-              }}
-              onClick={() => navigate({ to: '/todo/$listId', params: { listId: list.id } })}
-            >
-              <Text
-                size="1"
-                style={{
-                  maxWidth: '100%',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {list.name}
-              </Text>
+            <Button variant="ghost" size="1" onClick={() => setIsModalOpen(true)}>
+              + New
             </Button>
-          ))
-        )}
-      </Flex>
+          </Flex>
+
+          <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
+            <Dialog.Content size="2" style={{ maxWidth: 400 }}>
+              <Dialog.Title>Create New List</Dialog.Title>
+              <Dialog.Description size="2" mb="4">
+                Give your new to-do list a name.
+              </Dialog.Description>
+
+              <form onSubmit={handleCreateList}>
+                <Flex direction="column" gap="3">
+                  <TextField.Root
+                    placeholder="List name"
+                    value={newListName}
+                    onChange={e => setNewListName(e.target.value)}
+                    disabled={loading}
+                    autoFocus
+                    style={{
+                      resize: 'none',
+                      minHeight: '40px',
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (newListName.trim() && !loading) {
+                          handleCreateList(e);
+                        }
+                      }
+                    }}
+                  />
+
+                  <Flex gap="3" mt="4" justify="end">
+                    <Dialog.Close>
+                      <Button variant="soft" color="gray">
+                        Cancel
+                      </Button>
+                    </Dialog.Close>
+                    <Button type="submit" disabled={loading || !newListName.trim()}>
+                      Create
+                    </Button>
+                  </Flex>
+                </Flex>
+              </form>
+            </Dialog.Content>
+          </Dialog.Root>
+
+          {todoLists.length === 0 ? (
+            <Box px="1">
+              <Text size="1" color="gray">
+                No lists yet
+              </Text>
+            </Box>
+          ) : (
+            todoLists.map(list => (
+              <Button
+                key={list.id}
+                variant="ghost"
+                color="gray"
+                size="1"
+                my="1"
+                mx="1"
+                style={{
+                  justifyContent: 'flex-start',
+                  height: '22px',
+                  backgroundColor: list.id === currentListId ? 'var(--gray-5)' : undefined,
+                  overflow: 'hidden',
+                  color: 'var(--gray-12)',
+                }}
+                onClick={() => navigate({ to: '/todo/$listId', params: { listId: list.id } })}
+              >
+                <Text
+                  size="1"
+                  style={{
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {list.name}
+                </Text>
+              </Button>
+            ))
+          )}
+        </Flex>
+      </ScrollArea>
     </Flex>
   );
 };
