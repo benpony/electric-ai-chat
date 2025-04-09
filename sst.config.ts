@@ -133,6 +133,14 @@ export default $config({
             name: backendDomain,
             dns: sst.cloudflare.dns(),
           },
+          health: {
+            [`${backendPort}/http`]: {
+              path: `/test`,
+            },
+          },
+        },
+        health: {
+          command: [`CMD-SHELL`, `curl -fsS http://localhost:${backendPort}/test > /dev/null`],
         },
         environment: {
           DATABASE_URL: pooledDbUrl,
