@@ -1,6 +1,11 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="./.sst/platform/config.d.ts" />
 
+// TODO(stefanos): this is deployed in OSS Electric so
+// it cannot be torn down without removing this project as well,
+// slightly annyoing
+const REUSABLE_VPC_ID = `vpc-044836d73fc26a218`;
+
 export default $config({
   app(input) {
     return {
@@ -10,7 +15,7 @@ export default $config({
       providers: {
         cloudflare: `5.42.0`,
         aws: {
-          version: `6.66.2`,
+          version: `6.76.0`,
           profile: process.env.CI ? undefined : `marketing`,
         },
         neon: `0.6.3`,
@@ -69,15 +74,18 @@ export default $config({
 
     // Initialize AWS services
     const provider = new aws.Provider(`AiChatProvider`, { region });
-    const vpc = new sst.aws.Vpc(`AiChatVpc`, { nat: `ec2` }, { provider });
+    const vpc = sst.aws.Vpc.get(`AiChatVpc`, REUSABLE_VPC_ID, { provider });
     const cluster = new sst.aws.Cluster(`AiChatCluster`, { forceUpgrade: `v2`, vpc }, { provider });
 
     // Electric for syncing
     const syncService = new sst.aws.Service(`AiChatSyncService`, {
       cluster,
+      cpu: isProduction ? `2 vCPU` : `0.25 vCPU`,
+      memory: isProduction ? `4 GB` : `0.5 GB`,
       image: {
         context: `electric/packages/sync-service`,
       },
+      architecture: getSystemArch(),
       environment: {
         ELECTRIC_INSECURE: $jsonStringify(true),
         DATABASE_URL: dbUrl,
@@ -101,6 +109,9 @@ export default $config({
       `AiChatBackend`,
       {
         cluster,
+        cpu: isProduction ? `2 vCPU` : `0.25 vCPU`,
+        memory: isProduction ? `4 GB` : `0.5 GB`,
+        architecture: getSystemArch(),
         image: {
           context: `.`,
           dockerfile: `packages/api/Dockerfile`,
@@ -276,7 +287,23 @@ async function runSqlFile(connectionString: string, filePath: string, roleName?:
       sql = sql.replace(/postgres/g, roleName);
     }
     await client.query(sql);
+  } catch (err) {
+    console.error(`Failed to run SQL:`, err);
+    throw err;
   } finally {
     await client.end();
+  }
+}
+
+async function getSystemArch(): Promise<`x86_64` | `arm64`> {
+  const os = await import('node:os');
+  const currentArch = os.arch();
+  switch (currentArch) {
+    case `x64`:
+      return `x86_64`;
+    case `arm64`:
+      return `arm64`;
+    default:
+      throw new Error(`Cannot build docker image on arch ${currentArch} - must be x86_64 or arm64`);
   }
 }
