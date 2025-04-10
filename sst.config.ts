@@ -149,6 +149,7 @@ export default $config({
         image: {
           context: `.`,
           dockerfile: `packages/api/Dockerfile`,
+          tags: [`latest`],
         },
         loadBalancer: {
           ports: [{ listen: '443/https', forward: `${backendPort}/http` }],
@@ -172,7 +173,6 @@ export default $config({
           OPENAI_MODEL: 'gpt-4o-mini',
           OPENAI_API_KEY: openAiKey.value,
           PORT: $jsonStringify(backendPort),
-          REDEPLOY_COUNTER: '1',
         },
         dev: {
           directory: `packages/api/`,
