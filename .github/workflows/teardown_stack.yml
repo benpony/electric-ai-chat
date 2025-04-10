@@ -1,0 +1,45 @@
+name: Teardown production stack
+
+# This workflow is triggered manually using the 'workflow_dispatch' event.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: prod-deploy-group
+
+jobs:
+  teardown-stack:
+    name: Teardown production stack
+    environment: SST Deployments
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache SST state
+        uses: actions/cache@v4
+        with:
+          path: .sst
+          key: sst-cache-${{ github.event.number }}-${{ runner.os }}
+          restore-keys: |
+            sst-cache-${{ runner.os }}
+
+      - name: Remove production stack (!!!)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          echo "Removing production stage in 30s..."
+          sleep 30
+          pnpm sst remove --stage production
