@@ -172,6 +172,7 @@ export default $config({
           OPENAI_MODEL: 'gpt-4o-mini',
           OPENAI_API_KEY: openAiKey.value,
           PORT: $jsonStringify(backendPort),
+          REDEPLOY_COUNTER: '1',
         },
         dev: {
           directory: `packages/api/`,
