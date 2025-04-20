@@ -1,6 +1,5 @@
 
 <!-- blog post header image extra-landscape crop -->
-
 # Electric AI Chat
 
 AI chat application using Electric for resumeability, interruptability, multi-user and multi-agent sync. See the [Building&nbsp;AI&nbsp;apps&nbsp;on&nbsp;sync](https://electric-sql.com/blog/2025/04/09/building-ai-apps-on-sync) blog post for more context.
