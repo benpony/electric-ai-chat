@@ -20,6 +20,7 @@
     "@electric-sql/client": "^1.0.0",
     "@hono/node-server": "^1.14.0",
     "concurrently": "^9.1.2",
+    "dotenv": "^17.2.0",
     "hono": "^4.7.5",
     "install": "^0.13.0",
     "npm": "^11.2.0",

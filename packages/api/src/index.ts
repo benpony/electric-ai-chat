@@ -393,6 +393,33 @@ app.post('/chats/:id/pin', async (c: Context) => {
   }
 });
 
+// Delete a chat and all related data
+app.delete('/chats/:id', async (c: Context) => {
+  const chatId = c.req.param('id');
+
+  try {
+    // Check if chat exists
+    const [chat] = await db`
+      SELECT id FROM chats WHERE id = ${chatId}
+    `;
+
+    if (!chat) {
+      return c.json({ error: 'Chat not found' }, 404);
+    }
+
+    // Delete the chat (cascade will delete all related data)
+    await db`
+      DELETE FROM chats
+      WHERE id = ${chatId}
+    `;
+
+    return c.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting chat:', err);
+    return c.json({ error: 'Failed to delete chat' }, 500);
+  }
+});
+
 // Todo List Routes
 
 // Get all todo lists

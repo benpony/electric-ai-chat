@@ -171,6 +171,23 @@ export async function abortMessage(messageId: string): Promise<{ success: boolea
 }
 
 /**
+ * Delete a chat and all its related data
+ */
+export async function deleteChat(chatId: string): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_URL}/chats/${chatId}`, {
+    method: 'DELETE',
+    ...commonFetchOptions,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete chat');
+  }
+
+  return response.json();
+}
+
+/**
  * Create a new todo list
  */
 export async function createTodoList(name: string, id?: string): Promise<TodoList> {

@@ -1,12 +1,8 @@
-import OpenAI from 'openai';
 import { db } from '../../db.js';
 import { ChatCompletionTool } from 'openai/resources/chat/completions';
 import { model } from '../../utils.js';
 import { ToolHandler } from '../../types.js';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPEN_AI_KEY,
-});
+import { openai } from '../openai-client.js';
 
 export async function generateChatName(message: string) {
   try {
@@ -85,6 +81,30 @@ export async function pinChat(chatId: string, pinned: boolean): Promise<boolean>
   }
 }
 
+// Delete chat tool
+export async function deleteChatById(chatId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check if chat exists first
+    const [chat] = await db`
+      SELECT id, name FROM chats WHERE id = ${chatId}
+    `;
+
+    if (!chat) {
+      return { success: false, error: 'Chat not found' };
+    }
+
+    // Delete the chat (cascade will delete all related data)
+    await db`
+      DELETE FROM chats WHERE id = ${chatId}
+    `;
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error deleting chat:', err);
+    return { success: false, error: 'Failed to delete chat' };
+  }
+}
+
 // Basic chat tools
 export const basicTools: ChatCompletionTool[] = [
   {
@@ -135,6 +155,23 @@ export const basicTools: ChatCompletionTool[] = [
           },
         },
         required: ['pinned'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'delete_chat',
+      description: 'Delete the current chat session and all its messages. Use with caution as this action cannot be undone.',
+      parameters: {
+        type: 'object',
+        properties: {
+          confirm: {
+            type: 'boolean',
+            description: 'Must be set to true to confirm the deletion',
+          },
+        },
+        required: ['confirm'],
       },
     },
   },
@@ -203,6 +240,38 @@ export const basicToolHandlers: ToolHandler[] = [
           ? `\n\nI've ${pinned ? 'pinned' : 'unpinned'} this chat.`
           : '\n\nFailed to update pin status.',
       };
+    },
+  },
+  {
+    name: 'delete_chat',
+    getThinkingText: (args: unknown) => 'Deleting current chat...',
+    process: async (
+      args: unknown,
+      chatId: string,
+      messageId: string,
+      abortController: AbortController,
+      dbUrlParam?: { redactedUrl: string; redactedId: string; password: string }
+    ) => {
+      const { confirm } = args as { confirm: boolean };
+
+      if (!confirm) {
+        return {
+          content: '\n\nChat deletion cancelled. To delete this chat, you must confirm by setting confirm to true.',
+        };
+      }
+
+      const result = await deleteChatById(chatId);
+
+      if (result.success) {
+        return {
+          content: '\n\nThis chat has been permanently deleted. You will be redirected to the main screen.',
+          systemMessage: 'Chat successfully deleted',
+        };
+      } else {
+        return {
+          content: `\n\nFailed to delete chat: ${result.error}`,
+        };
+      }
     },
   },
 ];

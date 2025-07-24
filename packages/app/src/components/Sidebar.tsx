@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useMatchRoute } from '@tanstack/react-router';
-import { Box, Flex, Text, IconButton, Button, ScrollArea, Tooltip } from '@radix-ui/themes';
-import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin } from 'lucide-react';
+import { Box, Flex, Text, IconButton, Button, ScrollArea, Tooltip, AlertDialog } from '@radix-ui/themes';
+import { LogOut, Moon, Sun, MessageSquarePlus, Monitor, Pin, Trash2 } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useChatsShape } from '../shapes';
 import { useSidebar } from './SidebarProvider';
 import TodoLists from './TodoLists';
 import UserAvatar from './UserAvatar';
+import { deleteChat } from '../api';
 
 // Chat Button Component
 type ChatButtonProps = {
@@ -17,39 +18,111 @@ type ChatButtonProps = {
   };
   isActive: boolean;
   onClick: (chatId: string) => void;
+  onDelete: (chatId: string) => void;
 };
 
-function ChatButton({ chat, isActive, onClick }: ChatButtonProps) {
+function ChatButton({ chat, isActive, onClick, onDelete }: ChatButtonProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const handleDelete = async () => {
+    try {
+      await onDelete(chat.id);
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error('Failed to delete chat:', error);
+      // Could add error toast here
+    }
+  };
+
   return (
-    <Button
-      key={chat.id}
-      variant="ghost"
-      color="gray"
-      size="1"
-      my="1"
-      mx="1"
-      style={{
-        justifyContent: 'flex-start',
-        height: '22px',
-        backgroundColor: isActive ? 'var(--gray-5)' : undefined,
-        overflow: 'hidden',
-        color: 'var(--black)',
-      }}
-      onClick={() => onClick(chat.id)}
-    >
-      {chat.pinned && <Pin size={12} style={{ marginRight: '8px', opacity: 0.7 }} />}
-      <Text
-        size="1"
-        style={{
-          maxWidth: '100%',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
+    <>
+      <div
+        style={{ position: 'relative', width: '100%' }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
-        {chat.name}
-      </Text>
-    </Button>
+        <Button
+          key={chat.id}
+          variant="ghost"
+          color="gray"
+          size="1"
+          my="1"
+          mx="1"
+          style={{
+            justifyContent: 'flex-start',
+            height: '22px',
+            backgroundColor: isActive ? 'var(--gray-5)' : undefined,
+            overflow: 'hidden',
+            color: 'var(--black)',
+            width: 'calc(100% - 8px)',
+            paddingRight: isHovered ? '32px' : '8px',
+          }}
+          onClick={() => onClick(chat.id)}
+        >
+          {chat.pinned && <Pin size={12} style={{ marginRight: '8px', opacity: 0.7 }} />}
+          <Text
+            size="1"
+            style={{
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {chat.name}
+          </Text>
+        </Button>
+
+        {/* Delete button - appears on hover */}
+        {isHovered && (
+          <Tooltip content="Delete Chat">
+            <IconButton
+              variant="ghost"
+              size="1"
+              color="red"
+              style={{
+                position: 'absolute',
+                right: '4px',
+                top: '2px',
+                height: '18px',
+                width: '18px',
+                opacity: 0.7,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteDialog(true);
+              }}
+            >
+              <Trash2 size={12} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog.Root open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialog.Content style={{ maxWidth: 450 }}>
+          <AlertDialog.Title>Delete Chat</AlertDialog.Title>
+          <AlertDialog.Description size="2">
+            Are you sure you want to delete "{chat.name}"? This action cannot be undone and will permanently remove the chat and all its messages.
+          </AlertDialog.Description>
+
+          <Flex gap="3" mt="4" justify="end">
+            <AlertDialog.Cancel>
+              <Button variant="soft" color="gray">
+                Cancel
+              </Button>
+            </AlertDialog.Cancel>
+            <AlertDialog.Action>
+              <Button variant="solid" color="red" onClick={handleDelete}>
+                Delete Chat
+              </Button>
+            </AlertDialog.Action>
+          </Flex>
+        </AlertDialog.Content>
+      </AlertDialog.Root>
+    </>
   );
 }
 
@@ -201,6 +274,20 @@ export default function Sidebar() {
     }
   };
 
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+      await deleteChat(chatId);
+      // If the deleted chat is currently active, navigate to home
+      if (currentChatId === chatId) {
+        navigate({ to: '/' });
+      }
+      // Electric will automatically sync the deletion
+    } catch (error) {
+      console.error('Failed to delete chat:', error);
+      // Could add error toast here
+    }
+  };
+
   // Sort and separate chats into pinned and unpinned
   const sortedChats = chats.sort((a, b) => {
     // First sort by pinned status
@@ -277,6 +364,7 @@ export default function Sidebar() {
                 chat={chat}
                 isActive={chat.id === currentChatId}
                 onClick={handleChatClick}
+                onDelete={handleDeleteChat}
               />
             ))}
 
@@ -303,6 +391,7 @@ export default function Sidebar() {
                   chat={chat}
                   isActive={chat.id === currentChatId}
                   onClick={handleChatClick}
+                  onDelete={handleDeleteChat}
                 />
               ))
             )}

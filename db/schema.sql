@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    chat_id UUID REFERENCES chats(id),
+    chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
     content TEXT,
     user_name TEXT,
     role message_role,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE TABLE IF NOT EXISTS tokens (
-    message_id UUID REFERENCES messages(id),
+    message_id UUID REFERENCES messages(id) ON DELETE CASCADE,
     token_number INTEGER,
     token_text TEXT,
     PRIMARY KEY (message_id, token_number)
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS tokens (
 
 CREATE TABLE IF NOT EXISTS files (
     id UUID PRIMARY KEY,
-    chat_id UUID REFERENCES chats(id),
+    chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
     path TEXT NOT NULL,
     mime_type TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -112,4 +112,43 @@ END $$;
 CREATE INDEX IF NOT EXISTS user_presence_chat_id_idx ON user_presence (chat_id);
 -- Index for efficient cleanup of stale presence records
 CREATE INDEX IF NOT EXISTS user_presence_last_seen_idx ON user_presence (last_seen);
+
+-- Migration to add ON DELETE CASCADE to existing foreign keys if they don't have it
+-- This ensures all chat-related data is properly deleted when a chat is deleted
+DO $$
+BEGIN
+    -- Update messages table foreign key if it doesn't have ON DELETE CASCADE
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name LIKE '%messages_chat_id_fkey%' 
+        AND table_name = 'messages'
+    ) THEN
+        ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_chat_id_fkey;
+        ALTER TABLE messages ADD CONSTRAINT messages_chat_id_fkey 
+            FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE;
+    END IF;
+
+    -- Update files table foreign key if it doesn't have ON DELETE CASCADE  
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name LIKE '%files_chat_id_fkey%' 
+        AND table_name = 'files'
+    ) THEN
+        ALTER TABLE files DROP CONSTRAINT IF EXISTS files_chat_id_fkey;
+        ALTER TABLE files ADD CONSTRAINT files_chat_id_fkey 
+            FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE;
+    END IF;
+
+    -- Update tokens table foreign key if it doesn't have ON DELETE CASCADE
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name LIKE '%tokens_message_id_fkey%' 
+        AND table_name = 'tokens'
+    ) THEN
+        ALTER TABLE tokens DROP CONSTRAINT IF EXISTS tokens_message_id_fkey;
+        ALTER TABLE tokens ADD CONSTRAINT tokens_message_id_fkey 
+            FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
 COMMIT;
